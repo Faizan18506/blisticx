@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:blisticx/src/screens/settings/settings_screen.dart';
+import 'package:blisticx/src/screens/analysis/analysis_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   Future<void> _handleImageSelection(BuildContext context, ImageSource source) async {
     final picker = ImagePicker();
-    // For now we just pick the image to demonstrate functionality, implementation will come later.
     try {
       final XFile? image = await picker.pickImage(source: source);
-      if (image != null) {
-        // TODO: Navigate to analysis screen with image path
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Selected: ${image.name}')),
-          );
-        }
+      if (image != null && context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => AnalysisScreen(imagePath: image.path),
+          ),
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -36,8 +36,8 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.settings_rounded),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings coming soon!')),
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
               );
             },
           ),
