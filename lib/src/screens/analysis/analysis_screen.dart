@@ -1,6 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:blisticx/src/models/analysis_models.dart';
+import 'package:blisticx/src/providers/settings_provider.dart';
+import 'package:blisticx/src/services/coordinate_converter.dart';
+import 'package:blisticx/src/screens/analysis/results_summary_screen.dart';
 
 class AnalysisScreen extends StatefulWidget {
   final String imagePath;
@@ -22,7 +26,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   @override
   void initState() {
     super.initState();
-    _session = AnalysisSession(imagePath: widget.imagePath);
+    // Initialize session with current settings
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    _session = AnalysisSession(
+      imagePath: widget.imagePath,
+      unit: settings.isImperial ? "INCH" : "CM",
+      caliber: settings.selectedCaliber,
+      knownRefLength: 1.0, // Default to 1.0 unit (1 inch or 1 cm)
+    );
   }
 
   void _handleInteraction(Offset scenePosition) {
@@ -37,7 +48,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           } else if (_session.refEnd == null) {
             _session.refEnd = scenePosition;
           } else {
-            // Already have both? Replace the closest or just reset
             _session.refStart = scenePosition;
             _session.refEnd = null;
           }
@@ -47,6 +57,32 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           break;
       }
     });
+  }
+
+  void _finishAnalysis() {
+    if (_session.shots.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mark at least one shot')));
+      return;
+    }
+    if (_session.refStart == null || _session.refEnd == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Set a reference length')));
+      return;
+    }
+    if (_session.aimingPoint == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mark an aiming point (POA)')));
+      return;
+    }
+
+    try {
+      final GroupResult result = CoordinateConverter.analyze(_session);
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ResultsSummaryScreen(result: result),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   @override
@@ -77,18 +113,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.check_circle_rounded, color: Colors.greenAccent),
-            onPressed: () {
-               // Validate and proceed
-               if (_session.shots.isEmpty) {
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mark at least one shot')));
-                 return;
-               }
-               if (_session.refStart == null || _session.refEnd == null) {
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Set a reference length')));
-                 return;
-               }
-               // Proceed to results
-            },
+            onPressed: _finishAnalysis,
           ),
         ],
       ),
@@ -281,7 +306,6 @@ class _LinePainter extends CustomPainter {
   bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
 
-// ... _ShotMarker, _Magnifier, _CrosshairPainter Classes same as before ...
 class _ShotMarker extends StatelessWidget {
   final Color color;
   const _ShotMarker({required this.color});
@@ -320,7 +344,7 @@ class _Magnifier extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 3),
-        boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)],
+        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -338,7 +362,7 @@ class _Magnifier extends StatelessWidget {
             ),
           ),
           Center(
-            child: Container(
+            child: SizedBox(
               width: 150,
               height: 150,
               child: CustomPaint(painter: _CrosshairPainter()),

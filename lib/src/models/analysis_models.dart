@@ -31,6 +31,8 @@ class AnalysisSession {
   Offset? refEnd;
   double knownRefLength; // e.g. 1.0 inch
   double distance; // distance to target
+  String unit; // "INCH" or "CM"
+  String caliber;
 
   AnalysisSession({
     required this.imagePath,
@@ -40,5 +42,36 @@ class AnalysisSession {
     this.refEnd,
     this.knownRefLength = 1.0,
     this.distance = 100.0,
+    this.unit = "INCH",
+    this.caliber = ".260 / 6.5mm",
   }) : shots = shots ?? [];
 }
+
+class GroupResult {
+  final String imagePath;
+  final double groupSize; // Max spread
+  final double width;
+  final double height;
+  final double meanRadius;
+  final double elevation; // Offset from POA
+  final double windage; // Offset from POA
+  final int shotCount;
+  final String unit;
+  final String caliber;
+  final List<Offset> normalizedShots; // Coordinates relative to POA in units
+
+  GroupResult({
+    required this.imagePath,
+    required this.groupSize,
+    required this.width,
+    required this.height,
+    required this.meanRadius,
+    required this.elevation,
+    required this.windage,
+    required this.shotCount,
+    required this.unit,
+    required this.caliber,
+    required this.normalizedShots,
+  });
+}
+
