@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:blisticx/src/models/analysis_models.dart';
+import 'package:blisticx/src/providers/groups_provider.dart';
 
 class ResultsSummaryScreen extends StatelessWidget {
   final GroupResult result;
@@ -103,9 +105,22 @@ class ResultsSummaryScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _ResultTile(
-                    label: 'MEAN RADIUS',
-                    value: '${result.meanRadius.toStringAsFixed(3)} ${result.unit}',
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ResultTile(
+                          label: 'MEAN RADIUS',
+                          value: '${result.meanRadius.toStringAsFixed(3)} ${result.unit}',
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _ResultTile(
+                          label: 'RADIAL SD',
+                          value: '${result.radialSD.toStringAsFixed(3)} ${result.unit}',
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   
@@ -135,6 +150,8 @@ class ResultsSummaryScreen extends StatelessWidget {
                   const SizedBox(height: 40),
                   ElevatedButton(
                     onPressed: () {
+                      // Save to Hive via Provider
+                      Provider.of<GroupsProvider>(context, listen: false).addGroup(result);
                       Navigator.of(context).popUntil((route) => route.isFirst);
                     },
                     style: ElevatedButton.styleFrom(
@@ -144,6 +161,7 @@ class ResultsSummaryScreen extends StatelessWidget {
                     ),
                     child: const Text('FINISH & SAVE'),
                   ),
+
                   const SizedBox(height: 40),
                 ],
               ),
