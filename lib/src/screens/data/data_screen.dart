@@ -88,94 +88,117 @@ class _DataScreenState extends State<DataScreen> {
                 ],
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: groups.length,
-              itemBuilder: (context, index) {
-                final group = groups[index];
-                final isSelected = _selectedIds.contains(group.id);
+          : Column(
+              children: [
+                if (!_isSelectionMode)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    color: Colors.blueAccent.withOpacity(0.1),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blueAccent, size: 16),
+                        SizedBox(width: 8),
+                        Text(
+                          'Long press a card to select and compare',
+                          style: TextStyle(color: Colors.blueAccent, fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: groups.length,
+                    itemBuilder: (context, index) {
+                      final group = groups[index];
+                      final isSelected = _selectedIds.contains(group.id);
 
-                return Card(
-                  color: isSelected ? Colors.blueAccent.withOpacity(0.1) : Colors.grey[900],
-                  margin: const EdgeInsets.only(bottom: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: isSelected ? Colors.blueAccent : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(12),
-                    leading: Stack(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            image: DecorationImage(
-                              image: FileImage(File(group.imagePath)),
-                              fit: BoxFit.cover,
-                            ),
+                      return Card(
+                        color: isSelected ? Colors.blueAccent.withOpacity(0.1) : Colors.grey[900],
+                        margin: const EdgeInsets.only(bottom: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: isSelected ? Colors.blueAccent : Colors.transparent,
+                            width: 2,
                           ),
                         ),
-                        if (isSelected)
-                          const Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Icon(Icons.check_circle, color: Colors.blueAccent, size: 20),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(12),
+                          leading: Stack(
+                            children: [
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  image: DecorationImage(
+                                    image: FileImage(File(group.imagePath)),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                const Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Icon(Icons.check_circle, color: Colors.blueAccent, size: 20),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
-                    title: Text(
-                      '${group.shotCount} Shots - ${group.caliber}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 4),
-                        Text(
-                          'Size: ${group.groupSize.toStringAsFixed(3)} ${group.unit}',
-                          style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          _formatDate(group.timestamp),
-                          style: const TextStyle(color: Colors.grey, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                    trailing: _isSelectionMode 
-                      ? null 
-                      : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 16),
-                    onTap: () {
-                      if (_isSelectionMode) {
-                        _toggleSelection(group.id);
-                      } else {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => ResultsSummaryScreen(result: group),
+                          title: Text(
+                            '${group.shotCount} Shots - ${group.caliber}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                           ),
-                        );
-                      }
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                'Size: ${group.groupSize.toStringAsFixed(3)} ${group.unit}',
+                                style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                _formatDate(group.timestamp),
+                                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                          trailing: _isSelectionMode 
+                            ? null 
+                            : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 16),
+                          onTap: () {
+                            if (_isSelectionMode) {
+                              _toggleSelection(group.id);
+                            } else {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => ResultsSummaryScreen(result: group),
+                                ),
+                              );
+                            }
+                          },
+                          onLongPress: () {
+                            if (!_isSelectionMode) {
+                              setState(() {
+                                _isSelectionMode = true;
+                                _selectedIds.add(group.id);
+                              });
+                            } else {
+                              _confirmDelete(context, groupsProvider, group.id);
+                            }
+                          },
+                        ),
+                      );
                     },
-                    onLongPress: () {
-                      if (!_isSelectionMode) {
-                        setState(() {
-                          _isSelectionMode = true;
-                          _selectedIds.add(group.id);
-                        });
-                      } else {
-                        _confirmDelete(context, groupsProvider, group.id);
-                      }
-                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
     );
   }
+
 
   String _formatDate(DateTime date) {
     return "${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}";

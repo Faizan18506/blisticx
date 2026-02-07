@@ -61,6 +61,10 @@ class GroupResult {
   final String unit;
   final String caliber;
   final List<Offset> normalizedShots; // Coordinates relative to POA in units
+  final List<Offset> rawShots; // Original pixel coordinates
+  final Offset? aimingPoint; // Original pixel aiming point
+  final double imageWidth;
+  final double imageHeight;
   final DateTime timestamp;
 
   GroupResult({
@@ -77,6 +81,10 @@ class GroupResult {
     required this.unit,
     required this.caliber,
     required this.normalizedShots,
+    required this.rawShots,
+    this.aimingPoint,
+    required this.imageWidth,
+    required this.imageHeight,
     required this.timestamp,
   });
 
@@ -96,16 +104,36 @@ class GroupResult {
       'caliber': caliber,
       'shots_dx': normalizedShots.map((s) => s.dx).toList(),
       'shots_dy': normalizedShots.map((s) => s.dy).toList(),
+      'raw_shots_dx': rawShots.map((s) => s.dx).toList(),
+      'raw_shots_dy': rawShots.map((s) => s.dy).toList(),
+      'aiming_dx': aimingPoint?.dx,
+      'aiming_dy': aimingPoint?.dy,
+      'imageWidth': imageWidth,
+      'imageHeight': imageHeight,
       'timestamp': timestamp.toIso8601String(),
     };
   }
 
   factory GroupResult.fromMap(Map<dynamic, dynamic> map) {
+    // Reconstruct normalized shots
     List<double> dx = List<double>.from(map['shots_dx']);
     List<double> dy = List<double>.from(map['shots_dy']);
     List<Offset> shots = [];
     for (int i = 0; i < dx.length; i++) {
       shots.add(Offset(dx[i], dy[i]));
+    }
+
+    // Reconstruct raw shots
+    List<double> rdx = List<double>.from(map['raw_shots_dx'] ?? []);
+    List<double> rdy = List<double>.from(map['raw_shots_dy'] ?? []);
+    List<Offset> rawShotsList = [];
+    for (int i = 0; i < rdx.length; i++) {
+      rawShotsList.add(Offset(rdx[i], rdy[i]));
+    }
+
+    Offset? aiming;
+    if (map['aiming_dx'] != null) {
+      aiming = Offset(map['aiming_dx'], map['aiming_dy']);
     }
 
     return GroupResult(
@@ -122,9 +150,15 @@ class GroupResult {
       unit: map['unit'],
       caliber: map['caliber'],
       normalizedShots: shots,
+      rawShots: rawShotsList,
+      aimingPoint: aiming,
+      imageWidth: (map['imageWidth'] ?? 0).toDouble(),
+      imageHeight: (map['imageHeight'] ?? 0).toDouble(),
       timestamp: DateTime.parse(map['timestamp']),
     );
   }
 }
+
+
 
 

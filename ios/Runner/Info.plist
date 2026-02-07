@@ -43,7 +43,12 @@
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to take photos of targets for ballistic analysis.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs photo library access to select target images for ballistic analysis.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access if you record video of your shooting sessions.</string>
 </dict>
 </plist>
+

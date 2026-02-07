@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:blisticx/src/models/analysis_models.dart';
 import 'package:blisticx/src/providers/groups_provider.dart';
+import 'package:blisticx/src/services/coordinate_converter.dart';
 
 class ResultsSummaryScreen extends StatelessWidget {
+
   final GroupResult result;
 
   const ResultsSummaryScreen({super.key, required this.result});
@@ -26,36 +29,60 @@ class ResultsSummaryScreen extends StatelessWidget {
           children: [
             // Target Image Preview with Overlay (Simulated)
             AspectRatio(
-              aspectRatio: 1,
+              aspectRatio: result.imageWidth > 0 && result.imageHeight > 0 
+                ? result.imageWidth / result.imageHeight 
+                : 1,
               child: Container(
                 margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white10),
-                  image: DecorationImage(
-                    image: FileImage(File(result.imagePath)),
-                    fit: BoxFit.cover,
-                  ),
                 ),
+                clipBehavior: Clip.antiAlias,
                 child: Stack(
                   children: [
-                    Container(color: Colors.black38),
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.analytics_outlined, color: Colors.blueAccent, size: 48),
-                          Text(
-                            '${result.shotCount} SHOT GROUP',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    Positioned.fill(
+                      child: Image.file(
+                        File(result.imagePath),
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    // Draw Shots and Aiming Point
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        return CustomPaint(
+                          size: Size(constraints.maxWidth, constraints.maxHeight),
+                          painter: _OverlayPainter(
+                            shots: result.rawShots,
+                            aimingPoint: result.aimingPoint,
+                            imageWidth: result.imageWidth,
+                            imageHeight: result.imageHeight,
+                            caliber: result.caliber,
                           ),
-                        ],
+                        );
+                      },
+                    ),
+
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        color: Colors.black54,
+                        child: Text(
+                          '${result.shotCount} SHOT GROUP',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+
+
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -227,3 +254,92 @@ class _ResultTile extends StatelessWidget {
     );
   }
 }
+
+class _OverlayPainter extends CustomPainter {
+  final List<Offset> shots;
+  final Offset? aimingPoint;
+  final double imageWidth;
+  final double imageHeight;
+  final String caliber;
+
+  _OverlayPainter({
+    required this.shots,
+    this.aimingPoint,
+    required this.imageWidth,
+    required this.imageHeight,
+    required this.caliber,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (imageWidth == 0 || imageHeight == 0) return;
+
+    // Calculate BoxFit.contain scale and offsets
+    final double scale = min(size.width / imageWidth, size.height / imageHeight);
+    final double sw = imageWidth * scale;
+    final double sh = imageHeight * scale;
+    final double dx = (size.width - sw) / 2;
+    final double dy = (size.height - sh) / 2;
+
+
+    final shotPaint = Paint()
+      ..color = Colors.redAccent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    final aimingPaint = Paint()
+      ..color = Colors.blueAccent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    // Helper to map original pixel to screen pixel
+    Offset mapToScreen(Offset original) {
+      return Offset(
+        original.dx * scale + dx,
+        original.dy * scale + dy,
+      );
+    }
+
+    // Calculate caliber based size
+    final double caliberValue = CoordinateConverter.parseCaliber(caliber);
+    // Since we don't store pixelsPerUnit directly in Result, we derive it from normalized vs raw
+    // Or just use the original imageWidth and a realistic ratio.
+    // A better way: Marker size in pixels on original image = caliber * pixelsPerUnit.
+    // We already have this in ResultsSummaryScreen as result.caliber anyway.
+
+    // Draw Shots
+    for (var shot in shots) {
+      final screenPos = mapToScreen(shot);
+      
+      // Let's use a smart size that looks like a bullet hole but scales
+      double markerSize = (size.width * 0.02).clamp(4.0, 15.0);
+      
+      canvas.drawCircle(screenPos, markerSize, shotPaint);
+      canvas.drawCircle(screenPos, 1.0, shotPaint); // Center dot
+    }
+
+
+    // Draw Aiming Point (Reticle style)
+    if (aimingPoint != null) {
+      final screenPos = mapToScreen(aimingPoint!);
+      double aimSize = (size.width * 0.05).clamp(10.0, 30.0);
+      
+      canvas.drawCircle(screenPos, aimSize, aimingPaint);
+      canvas.drawLine(
+        Offset(screenPos.dx - aimSize * 1.2, screenPos.dy),
+        Offset(screenPos.dx + aimSize * 1.2, screenPos.dy),
+        aimingPaint,
+      );
+      canvas.drawLine(
+        Offset(screenPos.dx, screenPos.dy - aimSize * 1.2),
+        Offset(screenPos.dx, screenPos.dy + aimSize * 1.2),
+        aimingPaint,
+      );
+    }
+
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+

@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:blisticx/src/models/analysis_models.dart';
@@ -22,19 +24,44 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   DigitizerMode _mode = DigitizerMode.shots;
   Offset? _tempDragPosition;
   bool _isDragging = false;
+  
+  double? _imageWidth;
+  double? _imageHeight;
 
   @override
   void initState() {
     super.initState();
+    _loadImageDimensions();
     // Initialize session with current settings
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     _session = AnalysisSession(
       imagePath: widget.imagePath,
       unit: settings.isImperial ? "INCH" : "CM",
       caliber: settings.selectedCaliber,
-      knownRefLength: 1.0, // Default to 1.0 unit (1 inch or 1 cm)
+      knownRefLength: 1.0, 
     );
   }
+
+  Future<void> _loadImageDimensions() async {
+    final data = await File(widget.imagePath).readAsBytes();
+    final ui.Image image = await decodeImageFromList(data);
+    if (mounted) {
+      setState(() {
+        _imageWidth = image.width.toDouble();
+        _imageHeight = image.height.toDouble();
+        
+        // Initial scale to fit the image on screen
+        final size = MediaQuery.of(context).size;
+        final double initialScale = min(
+          size.width / _imageWidth!, 
+          (size.height - 200) / _imageHeight!
+        );
+        _transformationController.value = Matrix4.identity() * (Matrix4.diagonal3Values(initialScale, initialScale, 1.0));
+      });
+    }
+  }
+
+
 
   void _handleInteraction(Offset scenePosition) {
     setState(() {
@@ -59,7 +86,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     });
   }
 
-  void _finishAnalysis() {
+  Future<void> _finishAnalysis() async {
     if (_session.shots.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mark at least one shot')));
       return;
@@ -74,7 +101,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
 
     try {
-      final GroupResult result = CoordinateConverter.analyze(_session);
+      final GroupResult result = CoordinateConverter.analyze(
+        _session, 
+        imageWidth: _imageWidth!, 
+        imageHeight: _imageHeight!
+      );
+      
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => ResultsSummaryScreen(result: result),
@@ -84,6 +116,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -148,47 +182,82 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   },
                   child: InteractiveViewer(
                     transformationController: _transformationController,
-                    boundaryMargin: const EdgeInsets.all(500),
-                    minScale: 0.1,
+                    boundaryMargin: const EdgeInsets.all(2000),
+                    minScale: 0.05,
                     maxScale: 20.0,
-                    child: Stack(
-                      children: [
-                        Image.file(
-                          File(widget.imagePath),
-                          fit: BoxFit.contain,
+                    constrained: false, // Essential to allow the child to be its true size
+                    child: _imageWidth == null 
+                      ? const Center(child: CircularProgressIndicator())
+                      : SizedBox(
+                          width: _imageWidth,
+                          height: _imageHeight,
+                          child: Stack(
+                            children: [
+                              Image.file(
+                                File(widget.imagePath),
+                                width: _imageWidth,
+                                height: _imageHeight,
+                                fit: BoxFit.fill,
+                              ),
+                              // Render Shots
+                              ..._session.shots.map((shot) {
+                                // Default larger visual size for high-res images
+                                double markerSize = (_imageWidth! * 0.05).clamp(40.0, 150.0);
+                                
+                                // Calculate caliber-based size if reference is set
+                                if (_session.refStart != null && _session.refEnd != null) {
+                                  final double pixelDistance = (_session.refEnd! - _session.refStart!).distance;
+                                  final double pixelsPerInch = pixelDistance / _session.knownRefLength;
+                                  final double caliberInches = CoordinateConverter.parseCaliber(_session.caliber);
+                                  
+                                  // Caliber size in pixels
+                                  markerSize = caliberInches * pixelsPerInch;
+                                  
+                                  // If the literal caliber is too tiny to see/tap, we boost it slightly 
+                                  // but keep it proportional. Visual minimum of 30px.
+                                  markerSize = markerSize.clamp(30.0, 500.0);
+                                }
+
+                                return Positioned(
+                                  left: shot.position.dx - markerSize / 2,
+                                  top: shot.position.dy - markerSize / 2,
+                                  child: _ShotMarker(color: Colors.redAccent, size: markerSize),
+                                );
+                              }),
+                              // Render Ref Points
+                              if (_session.refStart != null)
+                                Positioned(
+                                  left: _session.refStart!.dx - (_imageWidth! * 0.03).clamp(15.0, 60.0),
+                                  top: _session.refStart!.dy - (_imageWidth! * 0.03).clamp(15.0, 60.0),
+                                  child: Icon(Icons.add_circle, color: Colors.blueAccent, size: (_imageWidth! * 0.06).clamp(30.0, 120.0)),
+                                ),
+                              if (_session.refEnd != null)
+                                Positioned(
+                                  left: _session.refEnd!.dx - (_imageWidth! * 0.03).clamp(15.0, 60.0),
+                                  top: _session.refEnd!.dy - (_imageWidth! * 0.03).clamp(15.0, 60.0),
+                                  child: Icon(Icons.add_circle, color: Colors.blueAccent, size: (_imageWidth! * 0.06).clamp(30.0, 120.0)),
+                                ),
+                              if (_session.refStart != null && _session.refEnd != null)
+                                CustomPaint(
+                                  painter: _LinePainter(
+                                    _session.refStart!, 
+                                    _session.refEnd!, 
+                                    Colors.blueAccent,
+                                    thickness: (_imageWidth! * 0.01).clamp(4.0, 20.0),
+                                  ),
+                                ),
+                              // Render Aiming Point
+                              if (_session.aimingPoint != null)
+                                Positioned(
+                                  left: _session.aimingPoint!.dx - (_imageWidth! * 0.06).clamp(30.0, 100.0),
+                                  top: _session.aimingPoint!.dy - (_imageWidth! * 0.06).clamp(30.0, 100.0),
+                                  child: Icon(Icons.track_changes_rounded, color: Colors.orangeAccent, size: (_imageWidth! * 0.12).clamp(60.0, 200.0)),
+                                ),
+
+
+                            ],
+                          ),
                         ),
-                        // Render Shots
-                        ..._session.shots.map((shot) => Positioned(
-                              left: shot.position.dx - 12,
-                              top: shot.position.dy - 12,
-                              child: const _ShotMarker(color: Colors.redAccent),
-                            )),
-                        // Render Ref Points
-                        if (_session.refStart != null)
-                          Positioned(
-                            left: _session.refStart!.dx - 8,
-                            top: _session.refStart!.dy - 8,
-                            child: const Icon(Icons.add_circle, color: Colors.blueAccent, size: 16),
-                          ),
-                        if (_session.refEnd != null)
-                          Positioned(
-                            left: _session.refEnd!.dx - 8,
-                            top: _session.refEnd!.dy - 8,
-                            child: const Icon(Icons.add_circle, color: Colors.blueAccent, size: 16),
-                          ),
-                        if (_session.refStart != null && _session.refEnd != null)
-                           CustomPaint(
-                             painter: _LinePainter(_session.refStart!, _session.refEnd!, Colors.blueAccent),
-                           ),
-                        // Render Aiming Point
-                        if (_session.aimingPoint != null)
-                          Positioned(
-                            left: _session.aimingPoint!.dx - 15,
-                            top: _session.aimingPoint!.dy - 15,
-                            child: const Icon(Icons.track_changes_rounded, color: Colors.orangeAccent, size: 30),
-                          ),
-                      ],
-                    ),
                   ),
                 ),
                 
@@ -290,14 +359,15 @@ class _LinePainter extends CustomPainter {
   final Offset start;
   final Offset end;
   final Color color;
+  final double thickness;
 
-  _LinePainter(this.start, this.end, this.color);
+  _LinePainter(this.start, this.end, this.color, {this.thickness = 2.0});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 2.0
+      ..strokeWidth = thickness
       ..style = PaintingStyle.stroke;
     canvas.drawLine(start, end, paint);
   }
@@ -308,27 +378,29 @@ class _LinePainter extends CustomPainter {
 
 class _ShotMarker extends StatelessWidget {
   final Color color;
-  const _ShotMarker({required this.color});
+  final double size;
+  const _ShotMarker({required this.color, this.size = 24.0});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 24,
-      height: 24,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: color, width: 2),
+        border: Border.all(color: color, width: (size * 0.1).clamp(2.0, 8.0)),
       ),
       child: Center(
         child: Container(
-          width: 4,
-          height: 4,
+          width: (size * 0.2).clamp(4.0, 20.0),
+          height: (size * 0.2).clamp(4.0, 20.0),
           decoration: BoxDecoration(shape: BoxShape.circle, color: color),
         ),
       ),
     );
   }
 }
+
 
 class _Magnifier extends StatelessWidget {
   final String imagePath;
