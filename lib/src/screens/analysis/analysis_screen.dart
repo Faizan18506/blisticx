@@ -16,14 +16,21 @@ class AnalysisScreen extends StatefulWidget {
   @override
   State<AnalysisScreen> createState() => _AnalysisScreenState();
 }
-
 class _AnalysisScreenState extends State<AnalysisScreen> {
   late AnalysisSession _session;
   final TransformationController _transformationController = TransformationController();
   
-  DigitizerMode _mode = DigitizerMode.shots;
+  DigitizerMode _mode = DigitizerMode.reference; // Start with reference mode
   Offset? _tempDragPosition;
   bool _isDragging = false;
+  
+  ui.Image? _uiImage; // For high-performance magnifier
+  
+  // Dragging state for fine-tuning
+  int? _dragShotIndex;
+  bool _dragAimingPoint = false;
+  bool _dragRefStart = false;
+  bool _dragRefEnd = false;
   
   double? _imageWidth;
   double? _imageHeight;
@@ -49,6 +56,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       setState(() {
         _imageWidth = image.width.toDouble();
         _imageHeight = image.height.toDouble();
+        _uiImage = image; // Cache for magnifier
         
         // Initial scale to fit the image on screen
         final size = MediaQuery.of(context).size;
@@ -63,10 +71,17 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
 
 
+
   void _handleInteraction(Offset scenePosition) {
     setState(() {
       switch (_mode) {
         case DigitizerMode.shots:
+          if (_session.refStart == null || _session.refEnd == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Please set a reference scale first!"))
+            );
+            return;
+          }
           _session.shots.add(Shot(position: scenePosition));
           break;
         case DigitizerMode.reference:
@@ -158,27 +173,86 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               children: [
                 GestureDetector(
                   onLongPressStart: (details) {
+                    final scenePos = _transformationController.toScene(details.localPosition);
+                    print("[DRAG START] Scene Position: $scenePos");
+                    
+                    // Check for proximity to existing points (Threshold: approx 50 pixels)
+                    const double threshold = 60.0;
+                    
+                    int? foundShotIndex;
+                    for (int i = 0; i < _session.shots.length; i++) {
+                      if ((_session.shots[i].position - scenePos).distance < threshold) {
+                        foundShotIndex = i;
+                        break;
+                      }
+                    }
+
                     setState(() {
                       _isDragging = true;
-                      _tempDragPosition = _transformationController.toScene(details.localPosition);
+                      _tempDragPosition = scenePos;
+                      
+                      if (foundShotIndex != null) {
+                        _dragShotIndex = foundShotIndex;
+                        print(" -> Dragging Shot at index: $foundShotIndex");
+                      } else if (_session.aimingPoint != null && (_session.aimingPoint! - scenePos).distance < threshold) {
+                        _dragAimingPoint = true;
+                        print(" -> Dragging Aiming Point");
+                      } else if (_session.refStart != null && (_session.refStart! - scenePos).distance < threshold) {
+                        _dragRefStart = true;
+                        print(" -> Dragging Reference Start");
+                      } else if (_session.refEnd != null && (_session.refEnd! - scenePos).distance < threshold) {
+                        _dragRefEnd = true;
+                        print(" -> Dragging Reference End");
+                      } else {
+                        print(" -> No existing point found, will create new on release");
+                      }
                     });
                   },
                   onLongPressMoveUpdate: (details) {
+                    final scenePos = _transformationController.toScene(details.localPosition);
                     setState(() {
-                      _tempDragPosition = _transformationController.toScene(details.localPosition);
+                      _tempDragPosition = scenePos;
+                      
+                      // Update dragged point position in real-time
+                      if (_dragShotIndex != null) {
+                        _session.shots[_dragShotIndex!] = Shot(position: scenePos);
+                      } else if (_dragAimingPoint) {
+                        _session.aimingPoint = scenePos;
+                      } else if (_dragRefStart) {
+                        _session.refStart = scenePos;
+                      } else if (_dragRefEnd) {
+                        _session.refEnd = scenePos;
+                      }
                     });
                   },
                   onLongPressEnd: (details) {
-                    if (_tempDragPosition != null) {
-                      _handleInteraction(_tempDragPosition!);
+                    final scenePos = _transformationController.toScene(details.localPosition);
+                    print("[DRAG END] Final Scene Position: $scenePos");
+
+                    if (_dragShotIndex == null && !_dragAimingPoint && !_dragRefStart && !_dragRefEnd) {
+                      // Only add a new point if we were not dragging an existing one
+                      // AND if the user actually moved enough (handled by long press recognizer)
                     }
+
                     setState(() {
                       _isDragging = false;
                       _tempDragPosition = null;
+                      _dragShotIndex = null;
+                      _dragAimingPoint = false;
+                      _dragRefStart = false;
+                      _dragRefEnd = false;
                     });
                   },
-                  onTapDown: (details) {
-                    _handleInteraction(_transformationController.toScene(details.localPosition));
+                  onTap: () {
+                    // This is for quick taps only (add new shot)
+                  },
+                  onTapUp: (details) {
+                    // Detect a clean tap to add a point
+                    if (!_isDragging) {
+                      final scenePos = _transformationController.toScene(details.localPosition);
+                      print("[TAP] Adding point at: $scenePos");
+                      _handleInteraction(scenePos);
+                    }
                   },
                   child: InteractiveViewer(
                     transformationController: _transformationController,
@@ -202,7 +276,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                               // Render Shots
                               ..._session.shots.map((shot) {
                                 // Default larger visual size for high-res images
-                                double markerSize = (_imageWidth! * 0.05).clamp(40.0, 150.0);
+                                // Significantly increased size (vivid visibility)
+                                double markerSize = (_imageWidth! * 0.15).clamp(120.0, 500.0);
                                 
                                 // Calculate caliber-based size if reference is set
                                 if (_session.refStart != null && _session.refEnd != null) {
@@ -213,10 +288,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                                   // Caliber size in pixels
                                   markerSize = caliberInches * pixelsPerInch;
                                   
-                                  // If the literal caliber is too tiny to see/tap, we boost it slightly 
-                                  // but keep it proportional. Visual minimum of 30px.
-                                  markerSize = markerSize.clamp(30.0, 500.0);
+                                  // Boosting the caliber size visually so it's clearly visible 
+                                  // but remains proportional to others.
+                                  markerSize = markerSize.clamp(100.0, 1000.0);
                                 }
+
+
 
                                 return Positioned(
                                   left: shot.position.dx - markerSize / 2,
@@ -267,10 +344,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     top: 50,
                     left: size.width / 2 - 75,
                     child: _Magnifier(
-                      imagePath: widget.imagePath,
+                      image: _uiImage,
                       position: _tempDragPosition!,
                     ),
                   ),
+
               ],
             ),
           ),
@@ -287,25 +365,27 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _ModeButton(
-                    icon: Icons.adjust_rounded,
-                    label: 'Shots',
-                    isActive: _mode == DigitizerMode.shots,
-                    onTap: () => setState(() => _mode = DigitizerMode.shots),
-                    activeColor: Colors.redAccent,
-                  ),
-                  _ModeButton(
                     icon: Icons.straighten_rounded,
-                    label: 'Ref',
+                    label: '1. Scale',
                     isActive: _mode == DigitizerMode.reference,
                     onTap: () => setState(() => _mode = DigitizerMode.reference),
                     activeColor: Colors.blueAccent,
                   ),
                   _ModeButton(
+                    icon: Icons.adjust_rounded,
+                    label: '2. Shots',
+                    isActive: _mode == DigitizerMode.shots,
+                    onTap: () => setState(() => _mode = DigitizerMode.shots),
+                    activeColor: Colors.redAccent,
+                    isDisabled: _session.refStart == null || _session.refEnd == null,
+                  ),
+                  _ModeButton(
                     icon: Icons.track_changes_rounded,
-                    label: 'Aim',
+                    label: '3. Aim',
                     isActive: _mode == DigitizerMode.aiming,
                     onTap: () => setState(() => _mode = DigitizerMode.aiming),
                     activeColor: Colors.orangeAccent,
+                    isDisabled: _session.refStart == null || _session.refEnd == null,
                   ),
                 ],
               ),
@@ -324,32 +404,38 @@ class _ModeButton extends StatelessWidget {
   final VoidCallback onTap;
   final Color activeColor;
 
+  final bool isDisabled;
+
   const _ModeButton({
     required this.icon,
     required this.label,
     required this.isActive,
     required this.onTap,
     required this.activeColor,
+    this.isDisabled = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: isActive ? activeColor : Colors.grey, size: 28),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isActive ? activeColor : Colors.grey,
-              fontSize: 12,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+      onTap: isDisabled ? null : onTap,
+      child: Opacity(
+        opacity: isDisabled ? 0.3 : 1.0,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isActive ? activeColor : Colors.grey, size: 28),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? activeColor : Colors.grey,
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -403,13 +489,15 @@ class _ShotMarker extends StatelessWidget {
 
 
 class _Magnifier extends StatelessWidget {
-  final String imagePath;
+  final ui.Image? image;
   final Offset position;
 
-  const _Magnifier({required this.imagePath, required this.position});
+  const _Magnifier({required this.image, required this.position});
 
   @override
   Widget build(BuildContext context) {
+    if (image == null) return const SizedBox.shrink();
+    
     return Container(
       width: 150,
       height: 150,
@@ -419,43 +507,48 @@ class _Magnifier extends StatelessWidget {
         boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Transform.scale(
-            scale: 5,
-            alignment: Alignment.center,
-            child: Transform.translate(
-              offset: Offset(-position.dx, -position.dy),
-              child: Image.file(
-                File(imagePath),
-                fit: BoxFit.none,
-                alignment: Alignment.topLeft,
-              ),
-            ),
-          ),
-          Center(
-            child: SizedBox(
-              width: 150,
-              height: 150,
-              child: CustomPaint(painter: _CrosshairPainter()),
-            ),
-          ),
-        ],
+      child: CustomPaint(
+        painter: _MagnifierPainter(image: image!, position: position),
       ),
     );
   }
 }
 
-class _CrosshairPainter extends CustomPainter {
+class _MagnifierPainter extends CustomPainter {
+  final ui.Image image;
+  final Offset position;
+
+  _MagnifierPainter({required this.image, required this.position});
+
   @override
   void paint(Canvas canvas, Size size) {
+    final double zoom = 8.0; // Higher zoom for fine-tuning
+    final double radius = size.width / 2;
+    
+    // Source rectangle on the original image
+    final double srcW = size.width / zoom;
+    final double srcH = size.height / zoom;
+    final Rect src = Rect.fromCenter(
+      center: position,
+      width: srcW,
+      height: srcH,
+    );
+
+    // Destination rectangle (the magnifier circle)
+    final Rect dst = Rect.fromLTWH(0, 0, size.width, size.height);
+
+    canvas.drawImageRect(image, src, dst, Paint()..isAntiAlias = true);
+
+    // Draw Crosshair
     final paint = Paint()
       ..color = Colors.white70
       ..strokeWidth = 1.0;
-    canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), paint);
-    canvas.drawLine(Offset(size.width / 2, 0), Offset(size.width / 2, size.height), paint);
-    canvas.drawCircle(Offset(size.width / 2, size.height / 2), 2, Paint()..color = Colors.redAccent);
+    canvas.drawLine(Offset(0, radius), Offset(size.width, radius), paint);
+    canvas.drawLine(Offset(radius, 0), Offset(radius, size.height), paint);
+    canvas.drawCircle(Offset(radius, radius), 3, Paint()..color = Colors.redAccent);
   }
+
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
+  bool shouldRepaint(_MagnifierPainter oldDelegate) => 
+      oldDelegate.position != position;
 }
