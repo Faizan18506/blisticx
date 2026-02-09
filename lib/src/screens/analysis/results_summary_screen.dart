@@ -6,21 +6,78 @@ import 'package:blisticx/src/models/analysis_models.dart';
 import 'package:blisticx/src/providers/groups_provider.dart';
 import 'package:blisticx/src/services/coordinate_converter.dart';
 
-class ResultsSummaryScreen extends StatelessWidget {
-
+class ResultsSummaryScreen extends StatefulWidget {
   final GroupResult result;
 
   const ResultsSummaryScreen({super.key, required this.result});
 
   @override
+  State<ResultsSummaryScreen> createState() => _ResultsSummaryScreenState();
+}
+
+class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
+  late String _currentGroupName;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentGroupName = widget.result.groupName;
+  }
+
+  void _showRenameDialog() {
+    final controller = TextEditingController(text: _currentGroupName);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text("Rename Group"),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: "Enter group name",
+            hintStyle: TextStyle(color: Colors.white38),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("CANCEL"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                setState(() => _currentGroupName = controller.text);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text("SAVE"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isInch = result.unit == "INCH";
+    final isInch = widget.result.unit == "INCH";
 
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('ANALYSIS RESULTS'),
+        title: GestureDetector(
+          onTap: _showRenameDialog,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(child: Text(_currentGroupName)),
+              const SizedBox(width: 8),
+              const Icon(Icons.edit, size: 18, color: Colors.blueAccent),
+            ],
+          ),
+        ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -29,8 +86,8 @@ class ResultsSummaryScreen extends StatelessWidget {
           children: [
             // Target Image Preview with Overlay (Simulated)
             AspectRatio(
-              aspectRatio: result.imageWidth > 0 && result.imageHeight > 0 
-                ? result.imageWidth / result.imageHeight 
+              aspectRatio: widget.result.imageWidth > 0 && widget.result.imageHeight > 0 
+                ? widget.result.imageWidth / widget.result.imageHeight 
                 : 1,
               child: Container(
                 margin: const EdgeInsets.all(16),
@@ -43,7 +100,7 @@ class ResultsSummaryScreen extends StatelessWidget {
                   children: [
                     Positioned.fill(
                       child: Image.file(
-                        File(result.imagePath),
+                        File(widget.result.imagePath),
                         fit: BoxFit.contain,
                       ),
                     ),
@@ -53,11 +110,11 @@ class ResultsSummaryScreen extends StatelessWidget {
                         return CustomPaint(
                           size: Size(constraints.maxWidth, constraints.maxHeight),
                           painter: _OverlayPainter(
-                            shots: result.rawShots,
-                            aimingPoint: result.aimingPoint,
-                            imageWidth: result.imageWidth,
-                            imageHeight: result.imageHeight,
-                            caliber: result.caliber,
+                            shots: widget.result.rawShots,
+                            aimingPoint: widget.result.aimingPoint,
+                            imageWidth: widget.result.imageWidth,
+                            imageHeight: widget.result.imageHeight,
+                            caliber: widget.result.caliber,
                           ),
                         );
                       },
@@ -71,7 +128,7 @@ class ResultsSummaryScreen extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         color: Colors.black54,
                         child: Text(
-                          '${result.shotCount} SHOT GROUP',
+                          '${widget.result.shotCount} SHOT GROUP',
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
@@ -90,7 +147,7 @@ class ResultsSummaryScreen extends StatelessWidget {
                 children: [
                   _ResultTile(
                     label: 'GROUP SIZE',
-                    value: '${result.groupSize.toStringAsFixed(3)} ${result.unit}',
+                    value: '${widget.result.groupSize.toStringAsFixed(3)} ${widget.result.unit}',
                     isMain: true,
                   ),
                   const SizedBox(height: 16),
@@ -99,14 +156,14 @@ class ResultsSummaryScreen extends StatelessWidget {
                       Expanded(
                         child: _ResultTile(
                           label: 'WIDTH',
-                          value: '${result.width.toStringAsFixed(3)} ${result.unit}',
+                          value: '${widget.result.width.toStringAsFixed(3)} ${widget.result.unit}',
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: _ResultTile(
                           label: 'HEIGHT',
-                          value: '${result.height.toStringAsFixed(3)} ${result.unit}',
+                          value: '${widget.result.height.toStringAsFixed(3)} ${widget.result.unit}',
                         ),
                       ),
                     ],
@@ -117,16 +174,16 @@ class ResultsSummaryScreen extends StatelessWidget {
                       Expanded(
                         child: _ResultTile(
                           label: 'WINDAGE',
-                          value: '${result.windage.toStringAsFixed(3)} ${result.unit}',
-                          subLabel: result.windage > 0 ? 'RIGHT' : 'LEFT',
+                          value: '${widget.result.windage.toStringAsFixed(3)} ${widget.result.unit}',
+                          subLabel: widget.result.windage > 0 ? 'RIGHT' : 'LEFT',
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: _ResultTile(
                           label: 'ELEVATION',
-                          value: '${result.elevation.toStringAsFixed(3)} ${result.unit}',
-                          subLabel: result.elevation > 0 ? 'HIGH' : 'LOW',
+                          value: '${widget.result.elevation.toStringAsFixed(3)} ${widget.result.unit}',
+                          subLabel: widget.result.elevation > 0 ? 'HIGH' : 'LOW',
                         ),
                       ),
                     ],
@@ -137,14 +194,14 @@ class ResultsSummaryScreen extends StatelessWidget {
                       Expanded(
                         child: _ResultTile(
                           label: 'MEAN RADIUS',
-                          value: '${result.meanRadius.toStringAsFixed(3)} ${result.unit}',
+                          value: '${widget.result.meanRadius.toStringAsFixed(3)} ${widget.result.unit}',
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: _ResultTile(
                           label: 'RADIAL SD',
-                          value: '${result.radialSD.toStringAsFixed(3)} ${result.unit}',
+                          value: '${widget.result.radialSD.toStringAsFixed(3)} ${widget.result.unit}',
                         ),
                       ),
                     ],
@@ -167,7 +224,7 @@ class ResultsSummaryScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text('CALIBER', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
-                            Text(result.caliber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(widget.result.caliber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                           ],
                         ),
                       ],
@@ -177,8 +234,30 @@ class ResultsSummaryScreen extends StatelessWidget {
                   const SizedBox(height: 40),
                   ElevatedButton(
                     onPressed: () {
-                      // Save to Hive via Provider
-                      Provider.of<GroupsProvider>(context, listen: false).addGroup(result);
+                      // Final result to save (with potentially modified name)
+                      final finalResult = GroupResult(
+                        id: widget.result.id,
+                        imagePath: widget.result.imagePath,
+                        groupSize: widget.result.groupSize,
+                        width: widget.result.width,
+                        height: widget.result.height,
+                        meanRadius: widget.result.meanRadius,
+                        radialSD: widget.result.radialSD,
+                        elevation: widget.result.elevation,
+                        windage: widget.result.windage,
+                        shotCount: widget.result.shotCount,
+                        unit: widget.result.unit,
+                        caliber: widget.result.caliber,
+                        normalizedShots: widget.result.normalizedShots,
+                        rawShots: widget.result.rawShots,
+                        aimingPoint: widget.result.aimingPoint,
+                        imageWidth: widget.result.imageWidth,
+                        imageHeight: widget.result.imageHeight,
+                        timestamp: widget.result.timestamp,
+                        groupName: _currentGroupName,
+                      );
+                      
+                      Provider.of<GroupsProvider>(context, listen: false).addGroup(finalResult);
                       Navigator.of(context).popUntil((route) => route.isFirst);
                     },
                     style: ElevatedButton.styleFrom(
@@ -199,6 +278,7 @@ class ResultsSummaryScreen extends StatelessWidget {
     );
   }
 }
+
 
 class _ResultTile extends StatelessWidget {
   final String label;

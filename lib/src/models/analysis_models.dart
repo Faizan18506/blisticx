@@ -66,6 +66,7 @@ class GroupResult {
   final double imageWidth;
   final double imageHeight;
   final DateTime timestamp;
+  final String groupName; // New field for naming/renaming
 
   GroupResult({
     required this.id,
@@ -86,6 +87,7 @@ class GroupResult {
     required this.imageWidth,
     required this.imageHeight,
     required this.timestamp,
+    required this.groupName,
   });
 
   Map<String, dynamic> toMap() {
@@ -111,13 +113,14 @@ class GroupResult {
       'imageWidth': imageWidth,
       'imageHeight': imageHeight,
       'timestamp': timestamp.toIso8601String(),
+      'groupName': groupName,
     };
   }
 
   factory GroupResult.fromMap(Map<dynamic, dynamic> map) {
     // Reconstruct normalized shots
-    List<double> dx = List<double>.from(map['shots_dx']);
-    List<double> dy = List<double>.from(map['shots_dy']);
+    List<double> dx = List<double>.from(map['shots_dx'] ?? []);
+    List<double> dy = List<double>.from(map['shots_dy'] ?? []);
     List<Offset> shots = [];
     for (int i = 0; i < dx.length; i++) {
       shots.add(Offset(dx[i], dy[i]));
@@ -139,25 +142,27 @@ class GroupResult {
     return GroupResult(
       id: map['id'],
       imagePath: map['imagePath'],
-      groupSize: map['groupSize'],
-      width: map['width'],
-      height: map['height'],
-      meanRadius: map['meanRadius'],
-      radialSD: map['radialSD'],
-      elevation: map['elevation'],
-      windage: map['windage'],
-      shotCount: map['shotCount'],
-      unit: map['unit'],
-      caliber: map['caliber'],
+      groupSize: (map['groupSize'] ?? 0).toDouble(),
+      width: (map['width'] ?? 0).toDouble(),
+      height: (map['height'] ?? 0).toDouble(),
+      meanRadius: (map['meanRadius'] ?? 0).toDouble(),
+      radialSD: (map['radialSD'] ?? 0).toDouble(),
+      elevation: (map['elevation'] ?? 0).toDouble(),
+      windage: (map['windage'] ?? 0).toDouble(),
+      shotCount: map['shotCount'] ?? 0,
+      unit: map['unit'] ?? "INCH",
+      caliber: map['caliber'] ?? "Unknown",
       normalizedShots: shots,
       rawShots: rawShotsList,
       aimingPoint: aiming,
       imageWidth: (map['imageWidth'] ?? 0).toDouble(),
       imageHeight: (map['imageHeight'] ?? 0).toDouble(),
-      timestamp: DateTime.parse(map['timestamp']),
+      timestamp: DateTime.parse(map['timestamp'] ?? DateTime.now().toIso8601String()),
+      groupName: map['groupName'] ?? "Unnamed Group",
     );
   }
 }
+
 
 
 

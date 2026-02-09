@@ -30,6 +30,38 @@ class GroupsProvider with ChangeNotifier {
     _groups.removeWhere((g) => g.id == id);
     notifyListeners();
   }
+
+  Future<void> renameGroup(String id, String newName) async {
+    final index = _groups.indexWhere((g) => g.id == id);
+    if (index != -1) {
+      final updatedGroup = GroupResult(
+        id: _groups[index].id,
+        imagePath: _groups[index].imagePath,
+        groupSize: _groups[index].groupSize,
+        width: _groups[index].width,
+        height: _groups[index].height,
+        meanRadius: _groups[index].meanRadius,
+        radialSD: _groups[index].radialSD,
+        elevation: _groups[index].elevation,
+        windage: _groups[index].windage,
+        shotCount: _groups[index].shotCount,
+        unit: _groups[index].unit,
+        caliber: _groups[index].caliber,
+        normalizedShots: _groups[index].normalizedShots,
+        rawShots: _groups[index].rawShots,
+        aimingPoint: _groups[index].aimingPoint,
+        imageWidth: _groups[index].imageWidth,
+        imageHeight: _groups[index].imageHeight,
+        timestamp: _groups[index].timestamp,
+        groupName: newName,
+      );
+      
+      _groups[index] = updatedGroup;
+      await _box.put(id, updatedGroup.toMap());
+      notifyListeners();
+    }
+  }
+
   
   Future<void> clearAll() async {
     await _box.clear();

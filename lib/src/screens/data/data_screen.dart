@@ -148,13 +148,17 @@ class _DataScreenState extends State<DataScreen> {
                             ],
                           ),
                           title: Text(
-                            '${group.shotCount} Shots - ${group.caliber}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                            group.groupName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 4),
+                              Text(
+                                '${group.shotCount} Shots - ${group.caliber}',
+                                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                              ),
                               Text(
                                 'Size: ${group.groupSize.toStringAsFixed(3)} ${group.unit}',
                                 style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
@@ -181,10 +185,7 @@ class _DataScreenState extends State<DataScreen> {
                           },
                           onLongPress: () {
                             if (!_isSelectionMode) {
-                              setState(() {
-                                _isSelectionMode = true;
-                                _selectedIds.add(group.id);
-                              });
+                              _showGroupOptions(context, groupsProvider, group);
                             } else {
                               _confirmDelete(context, groupsProvider, group.id);
                             }
@@ -202,6 +203,81 @@ class _DataScreenState extends State<DataScreen> {
 
   String _formatDate(DateTime date) {
     return "${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+  }
+
+  void _showGroupOptions(BuildContext context, GroupsProvider provider, GroupResult group) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_rounded, color: Colors.blueAccent),
+              title: const Text('Rename Group', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _showRenameDialogFromList(context, provider, group);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.compare_arrows_rounded, color: Colors.orangeAccent),
+              title: const Text('Select for Comparison', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() {
+                  _isSelectionMode = true;
+                  _selectedIds.add(group.id);
+                });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+              title: const Text('Delete Analysis', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmDelete(context, provider, group.id);
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRenameDialogFromList(BuildContext context, GroupsProvider provider, GroupResult group) {
+    final controller = TextEditingController(text: group.groupName);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text("Rename Group"),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: "Enter group name",
+            hintStyle: TextStyle(color: Colors.white38),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                provider.renameGroup(group.id, controller.text);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text("SAVE"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _confirmDelete(BuildContext context, GroupsProvider provider, String id) {

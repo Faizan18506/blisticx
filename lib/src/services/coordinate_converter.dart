@@ -86,7 +86,9 @@ class CoordinateConverter {
         imageWidth: imageWidth,
         imageHeight: imageHeight,
         timestamp: DateTime.now(),
+        groupName: "Empty Group",
       );
+
     }
 
     // 3. Calculate Stats
@@ -142,6 +144,8 @@ class CoordinateConverter {
       imageWidth: imageWidth,
       imageHeight: imageHeight,
       timestamp: DateTime.now(),
+      groupName: "Group - ${DateTime.now().hour}:${DateTime.now().minute}",
     );
+
   }
 }
