@@ -7,6 +7,8 @@ import 'package:blisticx/src/screens/analysis/comparison_screen.dart';
 import 'package:blisticx/src/models/analysis_models.dart';
 import 'package:blisticx/src/services/comparison_service.dart';
 
+import 'package:blisticx/src/screens/analysis/combined_results_screen.dart';
+
 class DataScreen extends StatefulWidget {
   const DataScreen({super.key});
 
@@ -24,11 +26,12 @@ class _DataScreenState extends State<DataScreen> {
         _selectedIds.remove(id);
         if (_selectedIds.isEmpty) _isSelectionMode = false;
       } else {
-        if (_selectedIds.length < 2) {
+        // Allowing more than 2 for combining
+        if (_selectedIds.length < 10) { 
           _selectedIds.add(id);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Select only 2 groups to compare'))
+            const SnackBar(content: Text('Limit reached: Select up to 10 groups'))
           );
         }
       }
@@ -56,17 +59,35 @@ class _DataScreenState extends State<DataScreen> {
             )
           : null,
         actions: [
-          if (_isSelectionMode && _selectedIds.length == 2)
-            TextButton(
-              onPressed: () {
-                final selectedGroups = groups.where((g) => _selectedIds.contains(g.id)).toList();
-                final compResult = ComparisonService.compare(selectedGroups[0], selectedGroups[1]);
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => ComparisonScreen(result: compResult))
-                );
-              },
-              child: const Text('COMPARE', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
-            ),
+          if (_isSelectionMode && _selectedIds.length >= 2) ...[
+             if (_selectedIds.length == 2)
+               TextButton(
+                 onPressed: () {
+                   final selectedGroups = groups.where((g) => _selectedIds.contains(g.id)).toList();
+                   final compResult = ComparisonService.compare(selectedGroups[0], selectedGroups[1]);
+                   Navigator.of(context).push(
+                     MaterialPageRoute(builder: (context) => ComparisonScreen(result: compResult))
+                   );
+                 },
+                 child: const Text('COMPARE', style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
+               ),
+             TextButton(
+               onPressed: () {
+                 final selectedGroups = groups.where((g) => _selectedIds.contains(g.id)).toList();
+                 try {
+                    final combinedResult = ComparisonService.combine(selectedGroups);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => CombinedResultsScreen(result: combinedResult))
+                    );
+                 } catch (e) {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                     SnackBar(content: Text('Error combining groups: $e'))
+                   );
+                 }
+               },
+               child: const Text('COMBINE', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+             ),
+          ],
           if (!_isSelectionMode && groups.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent),
@@ -74,6 +95,7 @@ class _DataScreenState extends State<DataScreen> {
             )
         ],
       ),
+
       body: groups.isEmpty
           ? Center(
               child: Column(
