@@ -522,7 +522,7 @@ class _MagnifierPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double zoom = 8.0; // Higher zoom for fine-tuning
+    final double zoom = 6.0; // Higher zoom for fine-tuning
     final double radius = size.width / 2;
     
     // Source rectangle on the original image

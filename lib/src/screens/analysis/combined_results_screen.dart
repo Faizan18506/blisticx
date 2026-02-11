@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:blisticx/src/models/analysis_models.dart';
+import 'package:blisticx/src/providers/groups_provider.dart';
 import 'package:blisticx/src/services/comparison_service.dart';
 
 class CombinedResultsScreen extends StatelessWidget {
@@ -108,9 +110,70 @@ class CombinedResultsScreen extends StatelessWidget {
                 ],
               ),
             ),
+             const SizedBox(height: 24),
+             
+             // 4. Save Button
+             Padding(
+               padding: const EdgeInsets.symmetric(horizontal: 24.0),
+               child: ElevatedButton(
+                 onPressed: () => _showSaveDialog(context),
+                 style: ElevatedButton.styleFrom(
+                   backgroundColor: Colors.greenAccent,
+                   foregroundColor: Colors.black,
+                   padding: const EdgeInsets.symmetric(vertical: 16),
+                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                 ),
+                 child: const Row(
+                   mainAxisAlignment: MainAxisAlignment.center,
+                   children: [
+                     Icon(Icons.save_rounded),
+                     SizedBox(width: 8),
+                     Text('SAVE AS NEW DATASET', style: TextStyle(fontWeight: FontWeight.bold)),
+                   ],
+                 )
+               ),
+             ),
+             
              const SizedBox(height: 40),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showSaveDialog(BuildContext context) {
+    final controller = TextEditingController(text: "Combined Group");
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text("Save Combined Dataset"),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: "Enter dataset name",
+            hintStyle: TextStyle(color: Colors.white38),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                 final newGroup = result.toGroupResult(controller.text);
+                 Provider.of<GroupsProvider>(context, listen: false).addGroup(newGroup);
+                 Navigator.pop(context); // Close dialog
+                 Navigator.pop(context); // Go back to history
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('Combined dataset saved to history!'))
+                 );
+              }
+            },
+            child: const Text("SAVE"),
+          ),
+        ],
       ),
     );
   }

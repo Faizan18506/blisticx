@@ -27,6 +27,9 @@ class CombinedResult {
   final double meanRadius;
   final double width;
   final double height;
+  final double radialSD;
+  final double elevation;
+  final double windage;
   final String unit;
   final String caliber;
 
@@ -37,15 +40,43 @@ class CombinedResult {
     required this.meanRadius,
     required this.width,
     required this.height,
+    required this.radialSD,
+    required this.elevation,
+    required this.windage,
     required this.unit,
     required this.caliber,
   });
+
+  GroupResult toGroupResult(String name) {
+    final first = sourceGroups.first;
+    return GroupResult(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      imagePath: first.imagePath,
+      groupSize: groupSize,
+      width: width,
+      height: height,
+      meanRadius: meanRadius,
+      radialSD: radialSD,
+      elevation: elevation,
+      windage: windage,
+      shotCount: combinedShots.length,
+      unit: unit,
+      caliber: caliber,
+      normalizedShots: combinedShots,
+      rawShots: [], // Virtual group doesn't have original pixel shots
+      aimingPoint: null,
+      imageWidth: first.imageWidth,
+      imageHeight: first.imageHeight,
+      timestamp: DateTime.now(),
+      groupName: name,
+    );
+  }
 }
 
 class ComparisonService {
   static CombinedResult combine(List<GroupResult> groups) {
-    print("--- [COMBINED ANALYSIS START] ---");
-    print("Combining ${groups.length} groups...");
+    print("--- [ACCURATE COMBINED ANALYSIS START] ---");
+    print("Merging ${groups.length} datasets...");
 
     List<Offset> allShots = [];
     for (var g in groups) {
@@ -56,7 +87,15 @@ class ComparisonService {
        throw Exception("No shots found in selected groups");
     }
 
-    // Calculate Combined Stats
+    // 1. Calculate Group Center (MPI - Mean Point of Impact)
+    double sumX = allShots.map((s) => s.dx).fold(0, (a, b) => a + b);
+    double sumY = allShots.map((s) => s.dy).fold(0, (a, b) => a + b);
+    double centerX = sumX / allShots.length;
+    double centerY = sumY / allShots.length;
+    
+    print(" - MPI Calculated: Windage=${centerX.toStringAsFixed(4)}, Elevation=${centerY.toStringAsFixed(4)}");
+
+    // 2. Physical Dimensions
     double minX = allShots.map((s) => s.dx).reduce(min);
     double maxX = allShots.map((s) => s.dx).reduce(max);
     double minY = allShots.map((s) => s.dy).reduce(min);
@@ -65,7 +104,7 @@ class ComparisonService {
     double width = maxX - minX;
     double height = maxY - minY;
 
-    // Combined Group Size (Max Spread)
+    // 3. Combined Group Size (Max Spread between any two shots)
     double maxSpread = 0;
     for (int i = 0; i < allShots.length; i++) {
       for (int j = i + 1; j < allShots.length; j++) {
@@ -74,13 +113,20 @@ class ComparisonService {
       }
     }
 
-    // Mean Radius (Center is always 0,0 since aligned on POA)
-    double totalRadius = allShots.map((s) => s.distance).fold(0, (a, b) => a + b);
+    // 4. Mean Radius (Distance from EACH shot to the MPI)
+    Offset mpi = Offset(centerX, centerY);
+    double totalRadius = allShots.map((s) => (s - mpi).distance).fold(0, (a, b) => a + b);
     double meanRadius = totalRadius / allShots.length;
 
-    print(" - Total Combined Shots: ${allShots.length}");
-    print(" - Combined Group Size: ${maxSpread.toStringAsFixed(4)}");
-    print("--- [COMBINED ANALYSIS END] ---");
+    // 5. Radial Standard Deviation (Consistency)
+    double sumSquaredDiff = allShots
+        .map((s) => pow((s - mpi).distance - meanRadius, 2))
+        .fold(0.0, (prev, element) => prev + element.toDouble());
+    
+    double radialSD = sqrt(sumSquaredDiff / (allShots.length > 1 ? allShots.length - 1 : 1));
+
+    print(" - Aggregate Stats: Size=$maxSpread, MR=$meanRadius, SD=$radialSD");
+    print("--- [ACCURATE COMBINED ANALYSIS END] ---");
 
     return CombinedResult(
       sourceGroups: groups,
@@ -89,6 +135,9 @@ class ComparisonService {
       meanRadius: meanRadius,
       width: width,
       height: height,
+      radialSD: radialSD,
+      elevation: centerY,
+      windage: centerX,
       unit: groups.first.unit,
       caliber: groups.first.caliber,
     );
@@ -96,17 +145,27 @@ class ComparisonService {
 
   static ComparisonResult compare(GroupResult g1, GroupResult g2) {
     print("--- [STATISTICAL COMPARISON START] ---");
-    print("Comparing Group 1 (${g1.caliber}) vs Group 2 (${g2.caliber})");
+    print("Comparing Group 1 (${g1.groupName}) vs Group 2 (${g2.groupName})");
 
     // 1. Mean Radius Difference
+    // Mean Radius is ALREADY calculated from the group's center in the improved logic
     double diff = (g1.meanRadius - g2.meanRadius).abs();
-    print(" - Mean Radius 1: ${g1.meanRadius.toStringAsFixed(4)}");
-    print(" - Mean Radius 2: ${g2.meanRadius.toStringAsFixed(4)}");
+    print(" - Mean Radius 1 (MPI-based): ${g1.meanRadius.toStringAsFixed(4)}");
+    print(" - Mean Radius 2 (MPI-based): ${g2.meanRadius.toStringAsFixed(4)}");
     print(" - Difference: ${diff.toStringAsFixed(4)}");
 
     // 2. Mann-Whitney U Test
-    List<double> samples1 = g1.normalizedShots.map((s) => s.distance).toList();
-    List<double> samples2 = g2.normalizedShots.map((s) => s.distance).toList();
+    // We want to compare the "Tightness" (Precision) of the groups.
+    // So we use the distance of each shot from its OWN group center (MPI), not the POA (0,0).
+    
+    final Offset mpi1 = Offset(g1.windage, g1.elevation);
+    final Offset mpi2 = Offset(g2.windage, g2.elevation);
+
+    // Calculate distance of each shot from its own group center
+    List<double> samples1 = g1.normalizedShots.map((s) => (s - mpi1).distance).toList();
+    List<double> samples2 = g2.normalizedShots.map((s) => (s - mpi2).distance).toList();
+
+    print(" - Sample Sizes: n1=${samples1.length}, n2=${samples2.length}");
 
     double pValue = _calculateMannWhitneyPValue(samples1, samples2);
     bool significant = pValue < 0.05;
@@ -114,9 +173,17 @@ class ComparisonService {
     print(" - Calculated p-value: ${pValue.toStringAsFixed(4)}");
     print(" - Significant at 95% level? ${significant ? 'YES' : 'NO'}");
 
-    String msg = significant 
-      ? "This difference IS statistically significant at the 95% confidence level."
-      : "This difference is NOT statistically significant at the 95% confidence level.";
+    String msg;
+    if (significant) {
+      final betterGroup = g1.meanRadius < g2.meanRadius ? g1.groupName : g2.groupName;
+      final worseGroup = g1.meanRadius < g2.meanRadius ? g2.groupName : g1.groupName;
+      // Calculate % improvement
+      double improvement = (diff / max(g1.meanRadius, g2.meanRadius)) * 100;
+      
+      msg = "Significant Difference!\n$betterGroup is ${improvement.toStringAsFixed(1)}% tighter (more precise) than $worseGroup.";
+    } else {
+      msg = "No significant statistical difference detected between the two groups.";
+    }
 
     print("--- [STATISTICAL COMPARISON END] ---");
 

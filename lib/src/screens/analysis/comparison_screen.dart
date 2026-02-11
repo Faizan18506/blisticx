@@ -23,9 +23,9 @@ class ComparisonScreen extends StatelessWidget {
             // Side by Side Groups
             Row(
               children: [
-                Expanded(child: _GroupMiniCard(groupName: "Group 1", caliber: result.group1.caliber, color: Colors.blueAccent)),
+                Expanded(child: _GroupMiniCard(groupName: result.group1.groupName, caliber: result.group1.caliber, color: Colors.blueAccent)),
                 const SizedBox(width: 16),
-                Expanded(child: _GroupMiniCard(groupName: "Group 2", caliber: result.group2.caliber, color: Colors.orangeAccent)),
+                Expanded(child: _GroupMiniCard(groupName: result.group2.groupName, caliber: result.group2.caliber, color: Colors.orangeAccent)),
               ],
             ),
             const SizedBox(height: 32),
