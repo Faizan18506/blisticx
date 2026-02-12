@@ -67,7 +67,10 @@ class _DataScreenState extends State<DataScreen> {
                    final compResult = ComparisonService.compare(selectedGroups[0], selectedGroups[1]);
                    Navigator.of(context).push(
                      MaterialPageRoute(builder: (context) => ComparisonScreen(result: compResult))
-                   );
+                   ).then((_) => setState(() {
+                      _isSelectionMode = false;
+                      _selectedIds.clear();
+                   }));
                  },
                  child: const Text('COMPARE', style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
                ),
@@ -78,7 +81,10 @@ class _DataScreenState extends State<DataScreen> {
                     final combinedResult = ComparisonService.combine(selectedGroups);
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (context) => CombinedResultsScreen(result: combinedResult))
-                    );
+                    ).then((_) => setState(() {
+                       _isSelectionMode = false;
+                       _selectedIds.clear();
+                    }));
                  } catch (e) {
                    ScaffoldMessenger.of(context).showSnackBar(
                      SnackBar(content: Text('Error combining groups: $e'))

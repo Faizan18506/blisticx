@@ -66,7 +66,8 @@ class GroupResult {
   final double imageWidth;
   final double imageHeight;
   final DateTime timestamp;
-  final String groupName; // New field for naming/renaming
+  final String groupName;
+  final bool isCombined; // New flag
 
   GroupResult({
     required this.id,
@@ -88,6 +89,7 @@ class GroupResult {
     required this.imageHeight,
     required this.timestamp,
     required this.groupName,
+    this.isCombined = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -104,10 +106,14 @@ class GroupResult {
       'shotCount': shotCount,
       'unit': unit,
       'caliber': caliber,
+      'isCombined': isCombined,
+      
+      // Serialize lists of doubles for Hive compatibility
       'shots_dx': normalizedShots.map((s) => s.dx).toList(),
       'shots_dy': normalizedShots.map((s) => s.dy).toList(),
       'raw_shots_dx': rawShots.map((s) => s.dx).toList(),
       'raw_shots_dy': rawShots.map((s) => s.dy).toList(),
+      
       'aiming_dx': aimingPoint?.dx,
       'aiming_dy': aimingPoint?.dy,
       'imageWidth': imageWidth,
@@ -119,24 +125,28 @@ class GroupResult {
 
   factory GroupResult.fromMap(Map<dynamic, dynamic> map) {
     // Reconstruct normalized shots
-    List<double> dx = List<double>.from(map['shots_dx'] ?? []);
-    List<double> dy = List<double>.from(map['shots_dy'] ?? []);
+    List<dynamic> dxList = map['shots_dx'] ?? [];
+    List<dynamic> dyList = map['shots_dy'] ?? [];
     List<Offset> shots = [];
-    for (int i = 0; i < dx.length; i++) {
-      shots.add(Offset(dx[i], dy[i]));
+    for (int i = 0; i < dxList.length; i++) {
+      if (i < dyList.length) {
+         shots.add(Offset((dxList[i] as num).toDouble(), (dyList[i] as num).toDouble()));
+      }
     }
 
     // Reconstruct raw shots
-    List<double> rdx = List<double>.from(map['raw_shots_dx'] ?? []);
-    List<double> rdy = List<double>.from(map['raw_shots_dy'] ?? []);
+    List<dynamic> rdxList = map['raw_shots_dx'] ?? [];
+    List<dynamic> rdyList = map['raw_shots_dy'] ?? [];
     List<Offset> rawShotsList = [];
-    for (int i = 0; i < rdx.length; i++) {
-      rawShotsList.add(Offset(rdx[i], rdy[i]));
+    for (int i = 0; i < rdxList.length; i++) {
+       if (i < rdyList.length) {
+         rawShotsList.add(Offset((rdxList[i] as num).toDouble(), (rdyList[i] as num).toDouble()));
+       }
     }
 
     Offset? aiming;
     if (map['aiming_dx'] != null) {
-      aiming = Offset(map['aiming_dx'], map['aiming_dy']);
+      aiming = Offset((map['aiming_dx'] as num).toDouble(), (map['aiming_dy'] as num).toDouble());
     }
 
     return GroupResult(
@@ -159,6 +169,7 @@ class GroupResult {
       imageHeight: (map['imageHeight'] ?? 0).toDouble(),
       timestamp: DateTime.parse(map['timestamp'] ?? DateTime.now().toIso8601String()),
       groupName: map['groupName'] ?? "Unnamed Group",
+      isCombined: map['isCombined'] ?? false,
     );
   }
 }

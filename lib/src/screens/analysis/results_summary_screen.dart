@@ -84,19 +84,24 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Target Image Preview with Overlay (Simulated)
+            // Target Image Preview (OR Graph for Combined Groups)
             AspectRatio(
-              aspectRatio: widget.result.imageWidth > 0 && widget.result.imageHeight > 0 
-                ? widget.result.imageWidth / widget.result.imageHeight 
+              aspectRatio: widget.result.isCombined || (widget.result.imageWidth > 0 && widget.result.imageHeight > 0)
+                ? (widget.result.isCombined ? 1.0 : widget.result.imageWidth / widget.result.imageHeight)
                 : 1,
               child: Container(
                 margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
+                  color: widget.result.isCombined ? Colors.grey[900] : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white10),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: Stack(
+                child: widget.result.isCombined 
+                  ? CustomPaint(
+                      painter: _SavedGraphPainter(result: widget.result),
+                    )
+                  : Stack(
                   children: [
                     Positioned.fill(
                       child: Image.file(
@@ -417,6 +422,62 @@ class _OverlayPainter extends CustomPainter {
       );
     }
 
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _SavedGraphPainter extends CustomPainter {
+  final GroupResult result;
+
+  _SavedGraphPainter({required this.result});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    
+    // 1. Draw Grid (1-inch grid lines approximation)
+    final paintGrid = Paint()
+      ..color = Colors.white10
+      ..strokeWidth = 1;
+
+    // Use max dimension for scale
+    double maxDim = max(result.width, result.height);
+    if (maxDim == 0) maxDim = 1.0; 
+    
+    // Pixels per Unit (e.g., px per Inch)
+    // We want the group to fit in 80% of width
+    final double scale = (size.width * 0.8) / maxDim;
+
+    // 2. Draw Center Crosshair (POA)
+    final paintAxis = Paint()..color = Colors.white24..strokeWidth = 1;
+    // X-Axis
+    canvas.drawLine(Offset(0, center.dy), Offset(size.width, center.dy), paintAxis);
+    // Y-Axis
+    canvas.drawLine(Offset(center.dx, 0), Offset(center.dx, size.height), paintAxis);
+
+    // 3. Draw Mean Point of Impact (MPI)
+    // Normalized Y is UP, Canvas Y is DOWN. 
+    // ScreenY = CenterY - (NormalizedY * scale)
+    final mpiX = center.dx + (result.windage * scale);
+    final mpiY = center.dy - (result.elevation * scale);
+    
+    // Draw MPI as Yellow Circle
+    canvas.drawCircle(Offset(mpiX, mpiY), 6.0, Paint()..color = Colors.yellowAccent..style = PaintingStyle.stroke..strokeWidth=2);
+    
+    // 4. Plot Shots (Green)
+    final paintShot = Paint()..color = Colors.greenAccent..style = PaintingStyle.fill;
+    
+    for (var shot in result.normalizedShots) {
+       final dx = shot.dx * scale; 
+       final dy = shot.dy * scale; 
+       
+       final screenX = center.dx + dx;
+       final screenY = center.dy - dy;
+       
+       canvas.drawCircle(Offset(screenX, screenY), 4.0, paintShot);
+    }
   }
 
   @override

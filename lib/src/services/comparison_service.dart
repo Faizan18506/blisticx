@@ -69,6 +69,7 @@ class CombinedResult {
       imageHeight: first.imageHeight,
       timestamp: DateTime.now(),
       groupName: name,
+      isCombined: true,
     );
   }
 }
