@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 class SettingsProvider extends ChangeNotifier {
-  bool _isImperial = true; // Inch vs Cm
+  bool _isImperial = true; // Overall base system
+  
+  // New Global Unit Settings
+  String _groupSizeUnit = "INCH"; // INCH, CM, MOA, MIL
+  String _atzUnit = "MIL";       // MOA, MIL, INCH, CM
+  String _distanceUnit = "YARDS"; // YARDS, METERS
   
   // Overlay Options
   bool _showGroupSize = true;
@@ -11,13 +16,17 @@ class SettingsProvider extends ChangeNotifier {
   bool _showWindage = true;
   
   // Appearance
-  bool _isOverlayLarge = false; // Smaller vs Larger
-  bool _isOverlayDark = false; // Light vs Dark (Note: this is overlay style, not app theme)
+  bool _isOverlayLarge = false; 
+  bool _isOverlayDark = false; 
 
-  String _selectedCaliber = ".260 / 6.5mm";
+  String _selectedCaliber = ".17 / 4.4mm";
 
   // Getters
   bool get isImperial => _isImperial;
+  String get groupSizeUnit => _groupSizeUnit;
+  String get atzUnit => _atzUnit;
+  String get distanceUnit => _distanceUnit;
+  
   bool get showGroupSize => _showGroupSize;
   bool get showGroupWH => _showGroupWH;
   bool get showAtz => _showAtz;
@@ -28,6 +37,24 @@ class SettingsProvider extends ChangeNotifier {
   String get selectedCaliber => _selectedCaliber;
 
   // Setters
+  void setGroupSizeUnit(String unit) {
+    _groupSizeUnit = unit;
+    // Auto-sync isImperial for base calcs if user picks INCH or CM
+    if (unit == "INCH") _isImperial = true;
+    if (unit == "CM") _isImperial = false;
+    notifyListeners();
+  }
+
+  void setAtzUnit(String unit) {
+    _atzUnit = unit;
+    notifyListeners();
+  }
+
+  void setDistanceUnit(String unit) {
+    _distanceUnit = unit;
+    notifyListeners();
+  }
+
   void setCaliber(String caliber) {
     _selectedCaliber = caliber;
     notifyListeners();
@@ -35,6 +62,8 @@ class SettingsProvider extends ChangeNotifier {
 
   void setUnitSystem(bool isImperial) {
     _isImperial = isImperial;
+    _groupSizeUnit = isImperial ? "INCH" : "CM";
+    _distanceUnit = isImperial ? "YARDS" : "METERS";
     notifyListeners();
   }
 
@@ -75,6 +104,9 @@ class SettingsProvider extends ChangeNotifier {
 
   void resetToDefaults() {
     _isImperial = true;
+    _groupSizeUnit = "INCH";
+    _atzUnit = "MIL";
+    _distanceUnit = "YARDS";
     _showGroupSize = true;
     _showGroupWH = true;
     _showAtz = true;

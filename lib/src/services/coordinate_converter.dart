@@ -118,8 +118,22 @@ class CoordinateConverter {
     List<double> individualRadii = normalizedShots.map((s) => (s - groupCenter).distance).toList();
     double meanRadius = individualRadii.reduce((a, b) => a + b) / normalizedShots.length;
 
-    double sumSquaredDiff = individualRadii.map((r) => pow(r - meanRadius, 2)).fold(0.0, (prev, element) => prev + element);
-    double radialSD = sqrt(sumSquaredDiff / (normalizedShots.length > 1 ? normalizedShots.length - 1 : 1));
+    // Correct Radial SD calculation (Standard Deviation of radii from center)
+    double sumSquaredDiff = 0;
+    for (double r in individualRadii) {
+      sumSquaredDiff += pow(r - meanRadius, 2);
+    }
+    
+    // Use Sample Standard Deviation (N-1) for more than 1 shot
+    double radialSD = normalizedShots.length > 1 
+        ? sqrt(sumSquaredDiff / (normalizedShots.length - 1))
+        : 0.0;
+
+    print(" - Statistics Info:");
+    print("    * Mean Point of Impact (MPI): (${centerX.toStringAsFixed(3)}, ${centerY.toStringAsFixed(3)})");
+    print("    * Number of Radii: ${individualRadii.length}");
+    print("    * Mean Radius: ${meanRadius.toStringAsFixed(4)}");
+    print("    * Radial SD: ${radialSD.toStringAsFixed(4)}");
 
 
     print(" - Results: Size=${maxSpread.toStringAsFixed(4)}, MeanRadius=${meanRadius.toStringAsFixed(4)}, RadialSD=${radialSD.toStringAsFixed(4)}");

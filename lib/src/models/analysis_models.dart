@@ -58,7 +58,7 @@ class GroupResult {
   final double elevation; // Offset from POA (Y)
   final double windage; // Offset from POA (X)
   final int shotCount;
-  final String unit;
+  final String unit; // Base unit (INCH/CM)
   final String caliber;
   final List<Offset> normalizedShots; // Coordinates relative to POA in units
   final List<Offset> rawShots; // Original pixel coordinates
@@ -68,8 +68,12 @@ class GroupResult {
   final DateTime timestamp;
   final String groupName;
   final bool isCombined;
-  final double distance; // Added
-  final String distanceUnit; // Added (YARDS or METERS)
+  final double distance; 
+  final String distanceUnit; 
+  
+  // NEW: Preferred display units to fix the "auto-change" bug
+  String groupUnit; 
+  String atzUnit; 
 
   GroupResult({
     required this.id,
@@ -94,7 +98,10 @@ class GroupResult {
     this.isCombined = false,
     this.distance = 100.0,
     this.distanceUnit = "YARDS",
-  });
+    String? groupUnit,
+    String? atzUnit,
+  }) : this.groupUnit = groupUnit ?? unit,
+       this.atzUnit = atzUnit ?? (unit == "INCH" ? "MOA" : "MIL");
 
   Map<String, dynamic> toMap() {
     return {
@@ -109,6 +116,8 @@ class GroupResult {
       'windage': windage,
       'shotCount': shotCount,
       'unit': unit,
+      'groupUnit': groupUnit,
+      'atzUnit': atzUnit,
       'caliber': caliber,
       'isCombined': isCombined,
       'distance': distance,
@@ -152,6 +161,8 @@ class GroupResult {
       aiming = Offset((map['aiming_dx'] as num).toDouble(), (map['aiming_dy'] as num).toDouble());
     }
 
+    String baseUnit = map['unit'] ?? "INCH";
+
     return GroupResult(
       id: map['id'],
       imagePath: map['imagePath'],
@@ -163,7 +174,9 @@ class GroupResult {
       elevation: (map['elevation'] ?? 0).toDouble(),
       windage: (map['windage'] ?? 0).toDouble(),
       shotCount: map['shotCount'] ?? 0,
-      unit: map['unit'] ?? "INCH",
+      unit: baseUnit,
+      groupUnit: map['groupUnit'] ?? baseUnit,
+      atzUnit: map['atzUnit'] ?? (baseUnit == "INCH" ? "MOA" : "MIL"),
       caliber: map['caliber'] ?? "Unknown",
       normalizedShots: shots,
       rawShots: rawShotsList,
@@ -178,6 +191,7 @@ class GroupResult {
     );
   }
 }
+
 
 
 

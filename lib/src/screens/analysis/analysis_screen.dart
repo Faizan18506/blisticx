@@ -182,14 +182,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
 
     try {
+      final settings = Provider.of<SettingsProvider>(context, listen: false);
+      
       final GroupResult result = CoordinateConverter.analyze(
         _session, 
         imageWidth: _imageWidth!, 
         imageHeight: _imageHeight!
       );
       
-      // Since CoordinateConverter.analyze might not have been updated to handle distanceUnit yet,
-      // let's manually override it in the object before passing to results screen
       final finalResult = GroupResult(
         id: result.id,
         imagePath: result.imagePath,
@@ -212,7 +212,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         groupName: result.groupName,
         isCombined: result.isCombined,
         distance: _session.distance,
-        distanceUnit: _session.distance < 0 ? "METERS" : "YARDS", // This is just a placeholder, I'll fix properly
+        distanceUnit: settings.distanceUnit, // Use global distance unit
+        groupUnit: settings.groupSizeUnit,   // CAPTURE CURRENT SETTINGS FOR HISTORY
+        atzUnit: settings.atzUnit,           // CAPTURE CURRENT SETTINGS FOR HISTORY
       );
 
       Navigator.of(context).push(

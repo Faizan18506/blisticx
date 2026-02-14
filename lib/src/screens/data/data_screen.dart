@@ -11,6 +11,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:blisticx/src/screens/analysis/combined_results_screen.dart';
 
+import 'package:blisticx/src/providers/settings_provider.dart';
+
 class DataScreen extends StatefulWidget {
   const DataScreen({super.key});
 
@@ -28,8 +30,7 @@ class _DataScreenState extends State<DataScreen> {
         _selectedIds.remove(id);
         if (_selectedIds.isEmpty) _isSelectionMode = false;
       } else {
-        // Allowing more than 2 for combining
-        if (_selectedIds.length < 10) { 
+        if (_selectedIds.length < 10) {
           _selectedIds.add(id);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -40,45 +41,60 @@ class _DataScreenState extends State<DataScreen> {
     });
   }
 
+  double _convert(GroupResult group, double value, String targetUnit) {
+    if (group.unit == targetUnit) return value;
+    final double dist = group.distance;
+    final bool isFromInch = group.unit == "INCH";
+
+    if (targetUnit == "INCH") return isFromInch ? value : value / 2.54;
+    if (targetUnit == "CM") return isFromInch ? value * 2.54 : value;
+    if (targetUnit == "MOA") {
+      return isFromInch ? value / ((dist / 100.0) * 1.047) : value / (dist * 2.9089);
+    } 
+    if (targetUnit == "MIL") {
+      return isFromInch ? value / ((dist / 100.0) * 3.6) : (value * 10.0) / dist;
+    }
+    return value;
+  }
+
   Future<void> _exportToCSV(List<GroupResult> groups) async {
     print("--- [CSV EXPORT START] ---");
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final gUnit = settings.groupSizeUnit;
+    final aUnit = settings.atzUnit;
+
     try {
       StringBuffer csv = StringBuffer();
-      // Header
-      csv.writeln("Date,GroupName,Caliber,ShotCount,GroupSize,Unit,Distance,DistanceUnit,MeanRadius,Width,Height");
+      // Header reflecting settings
+      csv.writeln("Date,GroupName,Caliber,ShotCount,GroupSize($gUnit),MeanRadius($gUnit),Width($gUnit),Height($gUnit),Windage($aUnit),Elevation($aUnit),DistValue,DistUnit");
 
       for (var group in groups) {
         String date = group.timestamp.toIso8601String().split('T')[0];
-        csv.writeln("${date},\"${group.groupName}\",${group.caliber},${group.shotCount},${group.groupSize.toStringAsFixed(3)},${group.unit},${group.distance},${group.distanceUnit},${group.meanRadius.toStringAsFixed(3)},${group.width.toStringAsFixed(3)},${group.height.toStringAsFixed(3)}");
+        
+        double size = _convert(group, group.groupSize, gUnit);
+        double radius = _convert(group, group.meanRadius, gUnit);
+        double w = _convert(group, group.width, gUnit);
+        double h = _convert(group, group.height, gUnit);
+        double wind = _convert(group, group.windage, aUnit);
+        double elev = _convert(group, group.elevation, aUnit);
+
+        csv.writeln("${date},\"${group.groupName}\",${group.caliber},${group.shotCount},${size.toStringAsFixed(3)},${radius.toStringAsFixed(3)},${w.toStringAsFixed(3)},${h.toStringAsFixed(3)},${wind.toStringAsFixed(3)},${elev.toStringAsFixed(3)},${group.distance},${group.distanceUnit}");
       }
 
-      print("Generated CSV content for ${groups.length} groups");
+      print("Generated CSV content synced with Settings");
 
-      // Get temporary directory to save the file
       final directory = await getTemporaryDirectory();
       final fileName = "BulletPros_Export_${DateTime.now().millisecondsSinceEpoch}.csv";
       final filePath = "${directory.path}/$fileName";
       
       final file = File(filePath);
       await file.writeAsString(csv.toString());
-      print("CSV File saved to temp storage: $filePath");
-
-      // Share the file (User can choose 'Save to Files' or share via WhatsApp/Email)
+      
       if (mounted) {
-        await Share.shareXFiles(
-          [XFile(filePath)],
-          subject: 'BulletPros Dispersion Data Export',
-          text: 'Here is my exported shooting data from BulletPros.',
-        );
-        print("Share dialog opened successfully");
+        await Share.shareXFiles([XFile(filePath)], subject: 'BulletPros Data Export');
       }
     } catch (e) {
       print("Error during CSV Export: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e'))
-        );
-      }
     }
   }
 

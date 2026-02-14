@@ -12,6 +12,9 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   // Local state to handle Save/Cancel logic
+  late String _groupSizeUnit;
+  late String _atzUnit;
+  late String _distanceUnit;
   late bool _isImperial;
   late bool _showGroupSize;
   late bool _showGroupWH;
@@ -26,6 +29,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     final settings = Provider.of<SettingsProvider>(context, listen: false);
+    _groupSizeUnit = settings.groupSizeUnit;
+    _atzUnit = settings.atzUnit;
+    _distanceUnit = settings.distanceUnit;
     _isImperial = settings.isImperial;
     _showGroupSize = settings.showGroupSize;
     _showGroupWH = settings.showGroupWH;
@@ -40,6 +46,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _saveSettings() {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     settings.setUnitSystem(_isImperial);
+    settings.setGroupSizeUnit(_groupSizeUnit);
+    settings.setAtzUnit(_atzUnit);
+    settings.setDistanceUnit(_distanceUnit);
     settings.toggleGroupSize(_showGroupSize);
     settings.toggleGroupWH(_showGroupWH);
     settings.toggleAtz(_showAtz);
@@ -54,6 +63,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _resetToDefaults() {
     setState(() {
       _isImperial = true;
+      _groupSizeUnit = "INCH";
+      _atzUnit = "MIL";
+      _distanceUnit = "YARDS";
       _showGroupSize = true;
       _showGroupWH = true;
       _showAtz = true;
@@ -61,7 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _showWindage = true;
       _isOverlayLarge = false;
       _isOverlayDark = false;
-      _selectedCaliber = ".260 / 6.5mm";
+      _selectedCaliber = ".17 / 4.4mm";
     });
   }
 
@@ -71,20 +83,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     Widget sectionTitle(String title) {
       return Padding(
-        padding: const EdgeInsets.only(top: 24.0, bottom: 0.0),
-        child: Column(
-          children: [
-            Text(
-              title.toUpperCase(),
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: Colors.grey,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
+        padding: const EdgeInsets.only(top: 24.0, bottom: 12.0),
+        child: Text(
+          title,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    Widget segmentedControl({
+      required List<String> options,
+      required String selectedValue,
+      required ValueChanged<String> onChanged,
+      int columns = 2,
+    }) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: columns,
+          childAspectRatio: (options.length == 2) ? 3.5 : (columns == 4 ? 2.5 : 4),
+          children: options.map((option) {
+            final isSelected = selectedValue == option;
+            return GestureDetector(
+              onTap: () => onChanged(option),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : Colors.transparent,
+                  border: Border.all(color: Colors.white10, width: 0.5),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  option,
+                  style: TextStyle(
+                    color: isSelected ? Colors.blueAccent : Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Divider(color: Colors.grey[800], thickness: 1),
-          ],
+            );
+          }).toList(),
         ),
       );
     }
@@ -99,9 +146,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return Container(
         height: 48,
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white24),
-          borderRadius: BorderRadius.circular(4),
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(12),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Row(
           children: [
             Expanded(
@@ -111,16 +159,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: isLeftSelected ? Colors.white : Colors.transparent,
                   alignment: Alignment.center,
                   child: Text(
-                    labelFalse.toUpperCase(),
+                    labelFalse,
                     style: TextStyle(
-                      color: isLeftSelected ? Colors.black : Colors.white,
+                      color: isLeftSelected ? Colors.blueAccent : Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ),
             ),
-            Container(width: 1, color: Colors.white24),
             Expanded(
               child: GestureDetector(
                 onTap: onRightTap,
@@ -128,9 +175,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: !isLeftSelected ? Colors.white : Colors.transparent,
                   alignment: Alignment.center,
                   child: Text(
-                    labelTrue.toUpperCase(),
+                    labelTrue,
                     style: TextStyle(
-                      color: !isLeftSelected ? Colors.black : Colors.white,
+                      color: !isLeftSelected ? Colors.blueAccent : Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -162,24 +209,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              sectionTitle('Reference Size Units'),
-              const SizedBox(height: 16),
-              Center(
-                child: Text(
-                  _isImperial ? "1.00 INCH" : "1.00 CM",
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
+              // 0. Base Reference Unit (The "Imperial vs Metric" heart of the app)
+              sectionTitle('Reference Unit (Base)'),
               customToggle(
-                labelFalse: 'Inch',
-                labelTrue: 'Cm',
+                labelFalse: 'INCH',
+                labelTrue: 'CM',
                 isLeftSelected: _isImperial,
-                onLeftTap: () => setState(() => _isImperial = true),
-                onRightTap: () => setState(() => _isImperial = false),
+                onLeftTap: () => setState(() {
+                  _isImperial = true;
+                  // If user picks base INCH, we often want group size to follow, but we let them choose.
+                }),
+                onRightTap: () => setState(() {
+                  _isImperial = false;
+                }),
               ),
+
+              // 1. Group Size Units
+              sectionTitle('Group Size Units'),
+              segmentedControl(
+                options: ["INCH", "CM", "MOA", "MIL"],
+                selectedValue: _groupSizeUnit,
+                onChanged: (val) => setState(() => _groupSizeUnit = val),
+                columns: 2, // Matches image design (2x2 grid)
+              ),
+
+              // 2. ATZ Units
+              sectionTitle('ATZ Units'),
+              segmentedControl(
+                options: ["MOA", "MIL", "INCH", "CM"],
+                selectedValue: _atzUnit,
+                onChanged: (val) => setState(() => _atzUnit = val),
+                columns: 4, // Horizontal row
+              ),
+
+              // 3. Distance Units
+              sectionTitle('Distance Units'),
+              segmentedControl(
+                options: ["YARDS", "METERS"],
+                selectedValue: _distanceUnit,
+                onChanged: (val) => setState(() => _distanceUnit = val),
+                columns: 2,
+              ),
+
               sectionTitle('Overlay Display Options'),
               _SwitchRow(
                 label: 'Group size',
@@ -248,23 +319,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 24),
               Row(
                 children: [
-                  SizedBox(width: 60, child: Text('Size', style: theme.textTheme.bodyLarge)),
-                  Expanded(
-                    child: customToggle(
-                      labelFalse: 'Smaller',
-                      labelTrue: 'Larger',
-                      isLeftSelected: !_isOverlayLarge,
-                      onLeftTap: () => setState(() => _isOverlayLarge = false),
-                      onRightTap: () => setState(() => _isOverlayLarge = true),
-                    ),
-                  ),
+                   Text('Size', style: theme.textTheme.bodyLarge),
+                   const Spacer(),
+                   SizedBox(
+                     width: 200,
+                     child: customToggle(
+                        labelFalse: 'Smaller',
+                        labelTrue: 'Larger',
+                        isLeftSelected: !_isOverlayLarge,
+                        onLeftTap: () => setState(() => _isOverlayLarge = false),
+                        onRightTap: () => setState(() => _isOverlayLarge = true),
+                      ),
+                   ),
                 ],
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
-                  SizedBox(width: 60, child: Text('Style', style: theme.textTheme.bodyLarge)),
-                  Expanded(
+                  Text('Style', style: theme.textTheme.bodyLarge),
+                  const Spacer(),
+                  SizedBox(
+                    width: 200,
                     child: customToggle(
                       labelFalse: 'Light',
                       labelTrue: 'Dark',

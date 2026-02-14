@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:blisticx/src/models/analysis_models.dart';
 import 'package:blisticx/src/providers/groups_provider.dart';
+import 'package:blisticx/src/providers/settings_provider.dart';
 import 'package:blisticx/src/services/coordinate_converter.dart';
 
 class ResultsSummaryScreen extends StatefulWidget {
@@ -17,30 +18,39 @@ class ResultsSummaryScreen extends StatefulWidget {
 
 class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
   late String _currentGroupName;
-  late String _displayUnit; 
 
   @override
   void initState() {
     super.initState();
     _currentGroupName = widget.result.groupName;
-    _displayUnit = widget.result.unit; 
     print("--- [RESULTS SCREEN INIT] ---");
     print("Base Unit: ${widget.result.unit}");
     print("Distance: ${widget.result.distance} ${widget.result.distanceUnit}");
   }
 
-  double _getVal(double physicalValue) {
-    if (_displayUnit == "INCH" || _displayUnit == "CM") return physicalValue;
+  // Robust conversion engine based on client formulas
+  double _convert(double value, String targetUnit) {
+    if (widget.result.unit == targetUnit) return value;
+    
     final double dist = widget.result.distance;
-    if (_displayUnit == "MOA") {
-      return widget.result.unit == "INCH" 
-        ? physicalValue / ((dist / 100.0) * 1.047)
-        : physicalValue / (dist * 2.9089);
-    } else {
-      return widget.result.unit == "INCH"
-        ? physicalValue / ((dist / 100.0) * 3.6)
-        : (physicalValue * 10.0) / dist;
+    final bool isFromInch = widget.result.unit == "INCH";
+
+    if (targetUnit == "INCH") return isFromInch ? value : value / 2.54;
+    if (targetUnit == "CM") return isFromInch ? value * 2.54 : value;
+
+    if (targetUnit == "MOA") {
+      return isFromInch 
+        ? value / ((dist / 100.0) * 1.047)
+        : value / (dist * 2.9089);
+    } 
+    
+    if (targetUnit == "MIL") {
+      return isFromInch
+        ? value / ((dist / 100.0) * 3.6)
+        : (value * 10.0) / dist;
     }
+
+    return value;
   }
 
   void _showRenameDialog() {
@@ -80,8 +90,10 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final unit = _displayUnit;
+    // We use the units saved INSIDE the result to ensure history items 
+    // don't change automatically when global settings change.
+    final gUnit = widget.result.groupUnit;
+    final aUnit = widget.result.atzUnit;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -128,7 +140,6 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
                         fit: BoxFit.contain,
                       ),
                     ),
-                    // Draw Shots and Aiming Point
                     LayoutBuilder(
                       builder: (context, constraints) {
                         return CustomPaint(
@@ -163,27 +174,7 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
               ),
             ),
 
-            // Unit Selector
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white10,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    _UnitTab(label: widget.result.unit, isActive: _displayUnit == widget.result.unit, onTap: () => setState(() => _displayUnit = widget.result.unit)),
-                    _UnitTab(label: "MOA", isActive: _displayUnit == "MOA", onTap: () => setState(() => _displayUnit = "MOA")),
-                    _UnitTab(label: "MIL", isActive: _displayUnit == "MIL", onTap: () => setState(() => _displayUnit = "MIL")),
-                  ],
-                ),
-              ),
-            ),
             const SizedBox(height: 16),
-
-
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -191,7 +182,7 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
                 children: [
                    _ResultTile(
                      label: 'GROUP SIZE',
-                     value: '${_getVal(widget.result.groupSize).toStringAsFixed(3)} $unit',
+                     value: '${_convert(widget.result.groupSize, gUnit).toStringAsFixed(3)} $gUnit',
                      isMain: true,
                    ),
                    const SizedBox(height: 16),
@@ -200,14 +191,14 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
                        Expanded(
                          child: _ResultTile(
                            label: 'WIDTH',
-                           value: '${_getVal(widget.result.width).toStringAsFixed(3)} $unit',
+                           value: '${_convert(widget.result.width, gUnit).toStringAsFixed(3)} $gUnit',
                          ),
                        ),
                        const SizedBox(width: 16),
                        Expanded(
                          child: _ResultTile(
                            label: 'HEIGHT',
-                           value: '${_getVal(widget.result.height).toStringAsFixed(3)} $unit',
+                           value: '${_convert(widget.result.height, gUnit).toStringAsFixed(3)} $gUnit',
                          ),
                        ),
                      ],
@@ -218,7 +209,7 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
                        Expanded(
                          child: _ResultTile(
                            label: 'WINDAGE',
-                           value: '${_getVal(widget.result.windage).toStringAsFixed(3)} $unit',
+                           value: '${_convert(widget.result.windage, aUnit).toStringAsFixed(3)} $aUnit',
                            subLabel: widget.result.windage > 0 ? 'RIGHT' : 'LEFT',
                          ),
                        ),
@@ -226,7 +217,7 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
                        Expanded(
                          child: _ResultTile(
                            label: 'ELEVATION',
-                           value: '${_getVal(widget.result.elevation).toStringAsFixed(3)} $unit',
+                           value: '${_convert(widget.result.elevation, aUnit).toStringAsFixed(3)} $aUnit',
                            subLabel: widget.result.elevation > 0 ? 'HIGH' : 'LOW',
                          ),
                        ),
@@ -238,14 +229,14 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
                        Expanded(
                          child: _ResultTile(
                            label: 'MEAN RADIUS',
-                           value: '${_getVal(widget.result.meanRadius).toStringAsFixed(3)} $unit',
+                           value: '${_convert(widget.result.meanRadius, gUnit).toStringAsFixed(3)} $gUnit',
                          ),
                        ),
                        const SizedBox(width: 16),
                        Expanded(
                          child: _ResultTile(
                            label: 'RADIAL SD',
-                           value: '${_getVal(widget.result.radialSD).toStringAsFixed(3)} $unit',
+                           value: '${_convert(widget.result.radialSD, gUnit).toStringAsFixed(3)} $gUnit',
                          ),
                        ),
                      ],
