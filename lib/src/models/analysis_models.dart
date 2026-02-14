@@ -67,7 +67,9 @@ class GroupResult {
   final double imageHeight;
   final DateTime timestamp;
   final String groupName;
-  final bool isCombined; // New flag
+  final bool isCombined;
+  final double distance; // Added
+  final String distanceUnit; // Added (YARDS or METERS)
 
   GroupResult({
     required this.id,
@@ -90,6 +92,8 @@ class GroupResult {
     required this.timestamp,
     required this.groupName,
     this.isCombined = false,
+    this.distance = 100.0,
+    this.distanceUnit = "YARDS",
   });
 
   Map<String, dynamic> toMap() {
@@ -107,8 +111,9 @@ class GroupResult {
       'unit': unit,
       'caliber': caliber,
       'isCombined': isCombined,
+      'distance': distance,
+      'distanceUnit': distanceUnit,
       
-      // Serialize lists of doubles for Hive compatibility
       'shots_dx': normalizedShots.map((s) => s.dx).toList(),
       'shots_dy': normalizedShots.map((s) => s.dy).toList(),
       'raw_shots_dx': rawShots.map((s) => s.dx).toList(),
@@ -124,7 +129,6 @@ class GroupResult {
   }
 
   factory GroupResult.fromMap(Map<dynamic, dynamic> map) {
-    // Reconstruct normalized shots
     List<dynamic> dxList = map['shots_dx'] ?? [];
     List<dynamic> dyList = map['shots_dy'] ?? [];
     List<Offset> shots = [];
@@ -134,7 +138,6 @@ class GroupResult {
       }
     }
 
-    // Reconstruct raw shots
     List<dynamic> rdxList = map['raw_shots_dx'] ?? [];
     List<dynamic> rdyList = map['raw_shots_dy'] ?? [];
     List<Offset> rawShotsList = [];
@@ -170,6 +173,8 @@ class GroupResult {
       timestamp: DateTime.parse(map['timestamp'] ?? DateTime.now().toIso8601String()),
       groupName: map['groupName'] ?? "Unnamed Group",
       isCombined: map['isCombined'] ?? false,
+      distance: (map['distance'] ?? 100.0).toDouble(),
+      distanceUnit: map['distanceUnit'] ?? "YARDS",
     );
   }
 }

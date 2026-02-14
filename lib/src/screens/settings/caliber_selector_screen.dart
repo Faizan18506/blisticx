@@ -11,18 +11,27 @@ class CaliberSelectorScreen extends StatefulWidget {
 
 class _CaliberSelectorScreenState extends State<CaliberSelectorScreen> {
   final List<String> _calibers = [
-    ".17 HMR",
-    ".22 LR",
+    ".17 / 4.4mm",
+    ".20 / 5.2mm",
     ".22 / 5.56mm",
-    ".223 Rem",
     ".243 / 6mm",
     ".25 / 6.35mm",
-    ".260 / 6.5mm",
+    ".26 / 6.5mm",
     ".270 / 7mm",
     ".280 / 7.2mm",
+    ".284 / 7mm",
     ".308 / 7.62mm",
-    ".338 Lapua",
-    ".50 BMG",
+    ".303 / 7.7mm",
+    ".323 / 8.0mm",
+    ".338 / 8.6mm",
+    ".357 / 9mm",
+    ".375 / 9.52mm",
+    ".40 / 10mm",
+    ".408 / 10.36mm",
+    ".416 / 10.56mm",
+    ".429 / 10.9mm",
+    ".45 / 11.5mm",
+    ".50 / 12.7mm",
   ];
 
   late FixedExtentScrollController _controller;

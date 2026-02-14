@@ -6,6 +6,8 @@ import 'package:blisticx/src/screens/analysis/results_summary_screen.dart';
 import 'package:blisticx/src/screens/analysis/comparison_screen.dart';
 import 'package:blisticx/src/models/analysis_models.dart';
 import 'package:blisticx/src/services/comparison_service.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:blisticx/src/screens/analysis/combined_results_screen.dart';
 
@@ -38,6 +40,48 @@ class _DataScreenState extends State<DataScreen> {
     });
   }
 
+  Future<void> _exportToCSV(List<GroupResult> groups) async {
+    print("--- [CSV EXPORT START] ---");
+    try {
+      StringBuffer csv = StringBuffer();
+      // Header
+      csv.writeln("Date,GroupName,Caliber,ShotCount,GroupSize,Unit,Distance,DistanceUnit,MeanRadius,Width,Height");
+
+      for (var group in groups) {
+        String date = group.timestamp.toIso8601String().split('T')[0];
+        csv.writeln("${date},\"${group.groupName}\",${group.caliber},${group.shotCount},${group.groupSize.toStringAsFixed(3)},${group.unit},${group.distance},${group.distanceUnit},${group.meanRadius.toStringAsFixed(3)},${group.width.toStringAsFixed(3)},${group.height.toStringAsFixed(3)}");
+      }
+
+      print("Generated CSV content for ${groups.length} groups");
+
+      // Get temporary directory to save the file
+      final directory = await getTemporaryDirectory();
+      final fileName = "BulletPros_Export_${DateTime.now().millisecondsSinceEpoch}.csv";
+      final filePath = "${directory.path}/$fileName";
+      
+      final file = File(filePath);
+      await file.writeAsString(csv.toString());
+      print("CSV File saved to temp storage: $filePath");
+
+      // Share the file (User can choose 'Save to Files' or share via WhatsApp/Email)
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(filePath)],
+          subject: 'BulletPros Dispersion Data Export',
+          text: 'Here is my exported shooting data from BulletPros.',
+        );
+        print("Share dialog opened successfully");
+      }
+    } catch (e) {
+      print("Error during CSV Export: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'))
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupsProvider = Provider.of<GroupsProvider>(context);
@@ -59,6 +103,16 @@ class _DataScreenState extends State<DataScreen> {
             )
           : null,
         actions: [
+          if (!_isSelectionMode && groups.isNotEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.file_download_outlined, color: Colors.blueAccent),
+              onPressed: () => _exportToCSV(groups),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent),
+              onPressed: () => _confirmClearAll(context, groupsProvider),
+            ),
+          ],
           if (_isSelectionMode && _selectedIds.length >= 2) ...[
              if (_selectedIds.length == 2)
                TextButton(
@@ -94,11 +148,6 @@ class _DataScreenState extends State<DataScreen> {
                child: const Text('COMBINE', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
              ),
           ],
-          if (!_isSelectionMode && groups.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent),
-              onPressed: () => _confirmClearAll(context, groupsProvider),
-            )
         ],
       ),
 

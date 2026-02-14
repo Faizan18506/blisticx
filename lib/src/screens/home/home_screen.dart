@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:blisticx/src/screens/settings/settings_screen.dart';
 import 'package:blisticx/src/screens/analysis/analysis_screen.dart';
+import 'package:image_picker/image_picker.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -10,15 +11,47 @@ class HomeScreen extends StatelessWidget {
   Future<void> _handleImageSelection(BuildContext context, ImageSource source) async {
     final picker = ImagePicker();
     try {
+      print("--- [IMAGE PICKER] --- Source: $source");
       final XFile? image = await picker.pickImage(source: source);
-      if (image != null && context.mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => AnalysisScreen(imagePath: image.path),
-          ),
+      
+      if (image == null) {
+        print("Selection cancelled by user");
+        return;
+      }
+
+      if (context.mounted) {
+        print("Picked: ${image.path}. Opening Cropper...");
+        
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: image.path,
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: 'Crop Your Target',
+              toolbarColor: Colors.black,
+              toolbarWidgetColor: Colors.blueAccent,
+              activeControlsWidgetColor: Colors.blueAccent,
+              initAspectRatio: CropAspectRatioPreset.original,
+              lockAspectRatio: false,
+            ),
+            IOSUiSettings(
+              title: 'Crop Your Target',
+            ),
+          ],
         );
+
+        if (croppedFile != null && context.mounted) {
+          print("Cropping Done: ${croppedFile.path}");
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AnalysisScreen(imagePath: croppedFile.path),
+            ),
+          );
+        } else {
+          print("Cropping cancelled or failed");
+        }
       }
     } catch (e) {
+      print("Error during image selection/crop: $e");
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),

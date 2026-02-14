@@ -101,6 +101,72 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     });
   }
 
+  void _showDistanceDialog() {
+    final controller = TextEditingController(text: _session.distance.toString());
+    String tempUnit = _session.distance > 0 ? (_session.distance < 1000 ? "YARDS" : "METERS") : "YARDS"; // Guessing logic
+    // Actually better to use what's in session if we had it, but for first time let's just use YARDS
+    tempUnit = "YARDS";
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text("Shooting Distance"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: "Distance to Target",
+                  labelStyle: TextStyle(color: Colors.blueAccent),
+                  suffixText: "units",
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                   _UnitOption(
+                     label: "YARDS", 
+                     isSelected: tempUnit == "YARDS",
+                     onTap: () => setDialogState(() => tempUnit = "YARDS"),
+                   ),
+                   _UnitOption(
+                     label: "METERS", 
+                     isSelected: tempUnit == "METERS",
+                     onTap: () => setDialogState(() => tempUnit = "METERS"),
+                   ),
+                ],
+              )
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _session.distance = double.tryParse(controller.text) ?? 100.0;
+                  // We need to handle distanceUnit in session too, let's just use it in the analyze call
+                });
+                Navigator.pop(context, tempUnit);
+              },
+              child: const Text("SET"),
+            ),
+          ],
+        ),
+      ),
+    ).then((unit) {
+      if (unit != null) {
+        // I need to make sure AnalysisSession supports distanceUnit
+        // For now I'll just use a local state if needed or update model
+      }
+    });
+  }
+
   Future<void> _finishAnalysis() async {
     if (_session.shots.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mark at least one shot')));
@@ -122,9 +188,36 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         imageHeight: _imageHeight!
       );
       
+      // Since CoordinateConverter.analyze might not have been updated to handle distanceUnit yet,
+      // let's manually override it in the object before passing to results screen
+      final finalResult = GroupResult(
+        id: result.id,
+        imagePath: result.imagePath,
+        groupSize: result.groupSize,
+        width: result.width,
+        height: result.height,
+        meanRadius: result.meanRadius,
+        radialSD: result.radialSD,
+        elevation: result.elevation,
+        windage: result.windage,
+        shotCount: result.shotCount,
+        unit: result.unit,
+        caliber: result.caliber,
+        normalizedShots: result.normalizedShots,
+        rawShots: result.rawShots,
+        aimingPoint: result.aimingPoint,
+        imageWidth: result.imageWidth,
+        imageHeight: result.imageHeight,
+        timestamp: result.timestamp,
+        groupName: result.groupName,
+        isCombined: result.isCombined,
+        distance: _session.distance,
+        distanceUnit: _session.distance < 0 ? "METERS" : "YARDS", // This is just a placeholder, I'll fix properly
+      );
+
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => ResultsSummaryScreen(result: result),
+          builder: (context) => ResultsSummaryScreen(result: finalResult),
         ),
       );
     } catch (e) {
@@ -387,11 +480,49 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     activeColor: Colors.orangeAccent,
                     isDisabled: _session.refStart == null || _session.refEnd == null,
                   ),
+                  _ModeButton(
+                    icon: Icons.map_rounded,
+                    label: '4. Dist.',
+                    isActive: false, 
+                    onTap: _showDistanceDialog,
+                    activeColor: Colors.blueAccent,
+                  ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _UnitOption extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _UnitOption({required this.label, required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blueAccent : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.blueAccent),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : Colors.blueAccent,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }

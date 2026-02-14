@@ -17,11 +17,30 @@ class ResultsSummaryScreen extends StatefulWidget {
 
 class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
   late String _currentGroupName;
+  late String _displayUnit; 
 
   @override
   void initState() {
     super.initState();
     _currentGroupName = widget.result.groupName;
+    _displayUnit = widget.result.unit; 
+    print("--- [RESULTS SCREEN INIT] ---");
+    print("Base Unit: ${widget.result.unit}");
+    print("Distance: ${widget.result.distance} ${widget.result.distanceUnit}");
+  }
+
+  double _getVal(double physicalValue) {
+    if (_displayUnit == "INCH" || _displayUnit == "CM") return physicalValue;
+    final double dist = widget.result.distance;
+    if (_displayUnit == "MOA") {
+      return widget.result.unit == "INCH" 
+        ? physicalValue / ((dist / 100.0) * 1.047)
+        : physicalValue / (dist * 2.9089);
+    } else {
+      return widget.result.unit == "INCH"
+        ? physicalValue / ((dist / 100.0) * 3.6)
+        : (physicalValue * 10.0) / dist;
+    }
   }
 
   void _showRenameDialog() {
@@ -62,7 +81,7 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isInch = widget.result.unit == "INCH";
+    final unit = _displayUnit;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -144,73 +163,93 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
               ),
             ),
 
+            // Unit Selector
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    _UnitTab(label: widget.result.unit, isActive: _displayUnit == widget.result.unit, onTap: () => setState(() => _displayUnit = widget.result.unit)),
+                    _UnitTab(label: "MOA", isActive: _displayUnit == "MOA", onTap: () => setState(() => _displayUnit = "MOA")),
+                    _UnitTab(label: "MIL", isActive: _displayUnit == "MIL", onTap: () => setState(() => _displayUnit = "MIL")),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
 
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 children: [
-                  _ResultTile(
-                    label: 'GROUP SIZE',
-                    value: '${widget.result.groupSize.toStringAsFixed(3)} ${widget.result.unit}',
-                    isMain: true,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ResultTile(
-                          label: 'WIDTH',
-                          value: '${widget.result.width.toStringAsFixed(3)} ${widget.result.unit}',
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _ResultTile(
-                          label: 'HEIGHT',
-                          value: '${widget.result.height.toStringAsFixed(3)} ${widget.result.unit}',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ResultTile(
-                          label: 'WINDAGE',
-                          value: '${widget.result.windage.toStringAsFixed(3)} ${widget.result.unit}',
-                          subLabel: widget.result.windage > 0 ? 'RIGHT' : 'LEFT',
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _ResultTile(
-                          label: 'ELEVATION',
-                          value: '${widget.result.elevation.toStringAsFixed(3)} ${widget.result.unit}',
-                          subLabel: widget.result.elevation > 0 ? 'HIGH' : 'LOW',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ResultTile(
-                          label: 'MEAN RADIUS',
-                          value: '${widget.result.meanRadius.toStringAsFixed(3)} ${widget.result.unit}',
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _ResultTile(
-                          label: 'RADIAL SD',
-                          value: '${widget.result.radialSD.toStringAsFixed(3)} ${widget.result.unit}',
-                        ),
-                      ),
-                    ],
-                  ),
+                   _ResultTile(
+                     label: 'GROUP SIZE',
+                     value: '${_getVal(widget.result.groupSize).toStringAsFixed(3)} $unit',
+                     isMain: true,
+                   ),
+                   const SizedBox(height: 16),
+                   Row(
+                     children: [
+                       Expanded(
+                         child: _ResultTile(
+                           label: 'WIDTH',
+                           value: '${_getVal(widget.result.width).toStringAsFixed(3)} $unit',
+                         ),
+                       ),
+                       const SizedBox(width: 16),
+                       Expanded(
+                         child: _ResultTile(
+                           label: 'HEIGHT',
+                           value: '${_getVal(widget.result.height).toStringAsFixed(3)} $unit',
+                         ),
+                       ),
+                     ],
+                   ),
+                   const SizedBox(height: 16),
+                   Row(
+                     children: [
+                       Expanded(
+                         child: _ResultTile(
+                           label: 'WINDAGE',
+                           value: '${_getVal(widget.result.windage).toStringAsFixed(3)} $unit',
+                           subLabel: widget.result.windage > 0 ? 'RIGHT' : 'LEFT',
+                         ),
+                       ),
+                       const SizedBox(width: 16),
+                       Expanded(
+                         child: _ResultTile(
+                           label: 'ELEVATION',
+                           value: '${_getVal(widget.result.elevation).toStringAsFixed(3)} $unit',
+                           subLabel: widget.result.elevation > 0 ? 'HIGH' : 'LOW',
+                         ),
+                       ),
+                     ],
+                   ),
+                   const SizedBox(height: 16),
+                   Row(
+                     children: [
+                       Expanded(
+                         child: _ResultTile(
+                           label: 'MEAN RADIUS',
+                           value: '${_getVal(widget.result.meanRadius).toStringAsFixed(3)} $unit',
+                         ),
+                       ),
+                       const SizedBox(width: 16),
+                       Expanded(
+                         child: _ResultTile(
+                           label: 'RADIAL SD',
+                           value: '${_getVal(widget.result.radialSD).toStringAsFixed(3)} $unit',
+                         ),
+                       ),
+                     ],
+                   ),
                   const SizedBox(height: 24),
                   
                   // Ammo Info
@@ -482,5 +521,38 @@ class _SavedGraphPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _UnitTab extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _UnitTab({required this.label, required this.isActive, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isActive ? Colors.blueAccent : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isActive ? Colors.black : Colors.white70,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
