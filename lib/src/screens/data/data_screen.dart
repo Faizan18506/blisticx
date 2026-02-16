@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:blisticx/src/providers/groups_provider.dart';
@@ -12,6 +13,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:blisticx/src/screens/analysis/combined_results_screen.dart';
 
 import 'package:blisticx/src/providers/settings_provider.dart';
+
+import 'package:file_picker/file_picker.dart';
 
 class DataScreen extends StatefulWidget {
   const DataScreen({super.key});
@@ -58,14 +61,12 @@ class _DataScreenState extends State<DataScreen> {
   }
 
   Future<void> _exportToCSV(List<GroupResult> groups) async {
-    print("--- [CSV EXPORT START] ---");
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final gUnit = settings.groupSizeUnit;
     final aUnit = settings.atzUnit;
 
     try {
       StringBuffer csv = StringBuffer();
-      // Header reflecting settings
       csv.writeln("Date,GroupName,Caliber,ShotCount,GroupSize($gUnit),MeanRadius($gUnit),Width($gUnit),Height($gUnit),Windage($aUnit),Elevation($aUnit),DistValue,DistUnit");
 
       for (var group in groups) {
@@ -81,20 +82,32 @@ class _DataScreenState extends State<DataScreen> {
         csv.writeln("${date},\"${group.groupName}\",${group.caliber},${group.shotCount},${size.toStringAsFixed(3)},${radius.toStringAsFixed(3)},${w.toStringAsFixed(3)},${h.toStringAsFixed(3)},${wind.toStringAsFixed(3)},${elev.toStringAsFixed(3)},${group.distance},${group.distanceUnit}");
       }
 
-      print("Generated CSV content synced with Settings");
-
-      final directory = await getTemporaryDirectory();
       final fileName = "BulletPros_Export_${DateTime.now().millisecondsSinceEpoch}.csv";
-      final filePath = "${directory.path}/$fileName";
       
-      final file = File(filePath);
-      await file.writeAsString(csv.toString());
-      
-      if (mounted) {
-        await Share.shareXFiles([XFile(filePath)], subject: 'BulletPros Data Export');
+      // Use FilePicker to allow the user to save it directly to a folder
+      String? outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save CSV Export',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+        bytes: Uint8List.fromList(csv.toString().codeUnits),
+      );
+
+      if (outputFile != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved: ${outputFile.split('/').last}'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       print("Error during CSV Export: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -271,7 +284,10 @@ class _DataScreenState extends State<DataScreen> {
                             } else {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (context) => ResultsSummaryScreen(result: group),
+                                  builder: (context) => ResultsSummaryScreen(
+                                    result: group,
+                                    isHistory: true,
+                                  ),
                                 ),
                               );
                             }

@@ -9,8 +9,13 @@ import 'package:blisticx/src/services/coordinate_converter.dart';
 
 class ResultsSummaryScreen extends StatefulWidget {
   final GroupResult result;
+  final bool isHistory;
 
-  const ResultsSummaryScreen({super.key, required this.result});
+  const ResultsSummaryScreen({
+    super.key, 
+    required this.result, 
+    this.isHistory = false,
+  });
 
   @override
   State<ResultsSummaryScreen> createState() => _ResultsSummaryScreenState();
@@ -26,6 +31,7 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
     print("--- [RESULTS SCREEN INIT] ---");
     print("Base Unit: ${widget.result.unit}");
     print("Distance: ${widget.result.distance} ${widget.result.distanceUnit}");
+    print("Is History: ${widget.isHistory}");
   }
 
   // Robust conversion engine based on client formulas
@@ -267,6 +273,8 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
                   ),
 
                   const SizedBox(height: 40),
+                  
+                  if (!widget.isHistory)
                   ElevatedButton(
                     onPressed: () {
                       // Final result to save (with potentially modified name)
@@ -282,6 +290,8 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
                         windage: widget.result.windage,
                         shotCount: widget.result.shotCount,
                         unit: widget.result.unit,
+                        groupUnit: widget.result.groupUnit,
+                        atzUnit: widget.result.atzUnit,
                         caliber: widget.result.caliber,
                         normalizedShots: widget.result.normalizedShots,
                         rawShots: widget.result.rawShots,
@@ -290,6 +300,8 @@ class _ResultsSummaryScreenState extends State<ResultsSummaryScreen> {
                         imageHeight: widget.result.imageHeight,
                         timestamp: widget.result.timestamp,
                         groupName: _currentGroupName,
+                        distance: widget.result.distance,
+                        distanceUnit: widget.result.distanceUnit,
                       );
                       
                       Provider.of<GroupsProvider>(context, listen: false).addGroup(finalResult);

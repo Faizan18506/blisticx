@@ -55,14 +55,15 @@ class _CaliberSelectorScreenState extends State<CaliberSelectorScreen> {
           icon: const Icon(Icons.refresh, color: Colors.white),
           onPressed: () {
             setState(() {
-              _selectedIndex = _calibers.indexOf(".260 / 6.5mm");
+              _selectedIndex = _calibers.indexOf(".22 / 5.56mm");
+              if (_selectedIndex == -1) _selectedIndex = 0;
               _controller.animateToItem(_selectedIndex, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
             });
           },
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
+            icon: const Icon(Icons.check, color: Colors.blueAccent),
             onPressed: () => Navigator.of(context).pop(_calibers[_selectedIndex]),
           ),
         ],
@@ -129,10 +130,24 @@ class _CaliberSelectorScreenState extends State<CaliberSelectorScreen> {
             ),
           ),
           const Padding(
-            padding: EdgeInsets.only(bottom: 40.0),
+            padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
             child: Text(
               'Select the Caliber that was used',
+              textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(_calibers[_selectedIndex]),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('SELECT CALIBER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
           ),
         ],
