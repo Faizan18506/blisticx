@@ -67,7 +67,8 @@ class _DataScreenState extends State<DataScreen> {
 
     try {
       StringBuffer csv = StringBuffer();
-      csv.writeln("Date,GroupName,Caliber,ShotCount,GroupSize($gUnit),MeanRadius($gUnit),Width($gUnit),Height($gUnit),Windage($aUnit),Elevation($aUnit),DistValue,DistUnit");
+      // Updated Header for Summary and Detailed Shot Data
+      csv.writeln("RecordType,Date,GroupName,Shot#,ShotX($gUnit),ShotY($gUnit),Caliber,ShotCount,GroupSize($gUnit),MeanRadius($gUnit),Width($gUnit),Height($gUnit),Windage($aUnit),Elevation($aUnit),DistValue,DistUnit");
 
       for (var group in groups) {
         String date = group.timestamp.toIso8601String().split('T')[0];
@@ -79,7 +80,22 @@ class _DataScreenState extends State<DataScreen> {
         double wind = _convert(group, group.windage, aUnit);
         double elev = _convert(group, group.elevation, aUnit);
 
-        csv.writeln("${date},\"${group.groupName}\",${group.caliber},${group.shotCount},${size.toStringAsFixed(3)},${radius.toStringAsFixed(3)},${w.toStringAsFixed(3)},${h.toStringAsFixed(3)},${wind.toStringAsFixed(3)},${elev.toStringAsFixed(3)},${group.distance},${group.distanceUnit}");
+        // 1. Write the Summary Row for this group (Empty strings for ShotX/ShotY)
+        
+        csv.writeln("SUMMARY,${date},\"${group.groupName}\",ALL,,,${group.caliber},${group.shotCount},${size.toStringAsFixed(3)},${radius.toStringAsFixed(3)},${w.toStringAsFixed(3)},${h.toStringAsFixed(3)},${wind.toStringAsFixed(3)},${elev.toStringAsFixed(3)},${group.distance},${group.distanceUnit}");
+
+        // 2. Write individual shot rows (Empty strings for Group Stats)
+        for (int i = 0; i < group.normalizedShots.length; i++) {
+          final shot = group.normalizedShots[i];
+          // Convert X and Y coordinates to the preferred display units
+          double shotX = _convert(group, shot.dx, gUnit);
+          double shotY = _convert(group, shot.dy, gUnit);
+          
+          csv.writeln("SHOT,${date},\"${group.groupName}\",${i + 1},${shotX.toStringAsFixed(4)},${shotY.toStringAsFixed(4)},${group.caliber},1,,,,,,,${group.distance},${group.distanceUnit}");
+        }
+        
+        // Add an empty line between groups for better readability
+        csv.writeln("");
       }
 
       final fileName = "BulletPros_Export_${DateTime.now().millisecondsSinceEpoch}.csv";
