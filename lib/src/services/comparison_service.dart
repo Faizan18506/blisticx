@@ -233,13 +233,81 @@ class ComparisonService {
     double u2 = (n1 * n2) - u1;
     double uMin = min(u1, u2);
     
+    print(" - U Statistic calculated: U_min = ${uMin.toStringAsFixed(1)} (U1=${u1.toStringAsFixed(1)}, U2=${u2.toStringAsFixed(1)})");
+
+    // Dynamic Programming for Exact P-Value (Method 3)
+    // Used for small sample sizes without ties (where uMin is an integer)
+    if (n1 < 20 && n2 < 20 && uMin == uMin.roundToDouble()) {
+       print(" - MODE: Using Exact Method (Method 3) for small sample size");
+       double exactP = _exactPValue(uMin.toInt(), n1, n2);
+       // p-value cannot exceed 1.0
+       double pValue = min(1.0, exactP);
+       print(" - Exact Method Result: $pValue");
+       return pValue;
+    }
+    
+    print(" - MODE: Using Normal Approximation with Continuity Correction (Method 2)");
     double meanU = (n1 * n2) / 2.0;
     double sigmaU = sqrt((n1 * n2 * (n1 + n2 + 1)) / 12.0);
     
     // Continuity correction
     double z = (uMin + 0.5 - meanU) / sigmaU;
     
-    return _zToPValue(z.abs()) * 2;
+    double pValApproximation = _zToPValue(z.abs()) * 2;
+    print(" - Method 2 Result: $pValApproximation");
+    return pValApproximation;
+  }
+
+  static double _exactPValue(int u, int m, int n) {
+    // DP table initialized with zeros
+    List<List<List<int>>> dp = List.generate(
+      m + 1,
+      (_) => List.generate(
+        n + 1,
+        (_) => List.filled(u + 1, 0),
+      ),
+    );
+
+    // Base cases: N(0, i, j) is always 1 (there's only 1 way to get U=0)
+    for (int i = 0; i <= m; i++) {
+      for (int j = 0; j <= n; j++) {
+        dp[i][j][0] = 1; 
+      }
+    }
+
+    // Fill DP table using recurrence
+    for (int i = 1; i <= m; i++) {
+      for (int j = 1; j <= n; j++) {
+        for (int k = 1; k <= u; k++) {
+          int count = dp[i][j - 1][k];
+          if (k - j >= 0) {
+            count += dp[i - 1][j][k - j];
+          }
+          dp[i][j][k] = count;
+        }
+      }
+    }
+
+    // Sum all combinations yielding a U-score <= observed U_min
+    int sum = 0;
+    for (int k = 0; k <= u; k++) {
+      sum += dp[m][n][k];
+    }
+
+    // Calculate total possible arrangements: (m+n) Choose m
+    double totalCombinations = _combinations(m + n, m);
+    
+    // exact p-value (times 2 for two-tailed)
+    return (sum / totalCombinations) * 2.0;
+  }
+
+  static double _combinations(int n, int k) {
+    if (k > n - k) k = n - k;
+    double res = 1.0;
+    for (int i = 1; i <= k; i++) {
+      res = res * (n - i + 1) / i;
+    }
+    return res;
   }
 
   static double _zToPValue(double z) {
